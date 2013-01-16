@@ -83,10 +83,12 @@
 #define LIBRA_CARD_REMOVE_DETECT_MAX_COUNT      5
 /** Number of Tx Queues */  
 #define NUM_TX_QUEUES 4
+// BEGIN Motorola, IKHSS7-12524 Increase wlan Kernel/driver buffer for mobile hotspot
 /** Queue length specified to OS in the net_device */
-#define NET_DEV_TX_QUEUE_LEN 100
+#define NET_DEV_TX_QUEUE_LEN 1000
 /** HDD's internal Tx Queue Length. Needs to be a power of 2 */
-#define HDD_TX_QUEUE_MAX_LEN 128
+#define HDD_TX_QUEUE_MAX_LEN 1024
+// END IKHSS7-12524
 /** HDD internal Tx Queue Low Watermark. Net Device TX queue is disabled
  *  when HDD queue becomes full. This Low watermark is used to enable
  *  the Net Device queue again */
@@ -868,6 +870,14 @@ struct hdd_context_s
    /** Pointer for nv data */
    const struct firmware *nv;
    
+ #ifdef WLAN_NV_OTA_UPGRADE
+   /** Pointer for nv data cal */
+   const struct firmware *nv_cal;
+
+   /** Pointer for nv data reg */
+   const struct firmware *nv_reg;
+#endif
+
    /** Pointer to the parent device */
    struct device *parent_dev;
 
@@ -1054,6 +1064,7 @@ void wlan_hdd_clear_concurrency_mode(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
 void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter);
 void hdd_prevent_suspend(void);
 void hdd_allow_suspend(void);
+void hdd_prevent_suspend_after_scan(long hz); //Mot IKHSS7-28961 :Empty scan results
 void hdd_allow_suspend_timeout(v_U32_t timeout);
 bool hdd_is_ssr_required(void);
 void hdd_set_ssr_required(e_hdd_ssr_required value);

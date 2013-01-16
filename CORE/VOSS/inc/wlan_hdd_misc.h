@@ -48,6 +48,11 @@
 #define WLAN_CFG_FILE              "wlan/prima/WCNSS_cfg.dat"
 #define WLAN_FW_FILE               ""
 #define WLAN_NV_FILE               "wlan/prima/WCNSS_qcom_wlan_nv.bin"
+#define WLAN_NV_DEFAULTFILE        "wlan/prima/WCNSS_qcom_wlan_nv_default.bin"
+#ifdef WLAN_NV_OTA_UPGRADE
+#define WLAN_NV_FILE_REGULATORY    "wlan/prima/WCNSS_qcom_wlan_nv_regulatory.bin"
+#define WLAN_NV_FILE_CALIBRATION  "wlan/prima/WCNSS_qcom_wlan_nv_calibration.bin"
+#endif
 #define WLAN_COUNTRY_INFO_FILE     "wlan/prima/WCNSS_wlan_country_info.dat"
 #define WLAN_HO_CFG_FILE           "wlan/prima/WCNSS_wlan_ho_config"
 #else

@@ -480,6 +480,7 @@ OBJS :=		$(BAP_OBJS) \
 		$(WDI_OBJS)
 
 EXTRA_CFLAGS += $(INCS)
+EXTRA_LDFLAGS += --strip-debug
 
 CDEFINES :=	-DANI_BUS_TYPE_PLATFORM=1 \
 		-DANI_LITTLE_BYTE_ENDIAN \
@@ -587,6 +588,9 @@ endif
 
 # enable the MAC Address auto-generation feature
 CDEFINES += -DWLAN_AUTOGEN_MACADDR_FEATURE
+
+#Allow for OTA upgrade of BIN files
+CDEFINES += -DWLAN_NV_OTA_UPGRADE
 
 ifneq (, $(filter msm8960, $(BOARD_PLATFORM)))
 EXTRA_CFLAGS += -march=armv7-a

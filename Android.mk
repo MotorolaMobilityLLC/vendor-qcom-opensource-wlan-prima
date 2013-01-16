@@ -39,14 +39,41 @@ else
        DLKM_DIR := build/dlkm
 endif
 
-ifeq ($(WLAN_PROPRIETARY),1)
-# For the proprietary driver the firmware files are handled here
 include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv.bin
 LOCAL_MODULE_TAGS  := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_PATH  := $(PRODUCT_OUT)/persist
+ifdef WIFI_DRIVER_NV_BASE_FILE
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_NV_BASE_FILE)
+else
 LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+endif
+include $(BUILD_PREBUILT)
+
+# calibration data will need to be overlay'd per product
+include $(CLEAR_VARS)
+LOCAL_MODULE       := WCNSS_qcom_wlan_nv_calibration.bin
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+ifdef WIFI_DRIVER_CAL_FILE
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_CAL_FILE)
+else
+LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+endif
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE       := WCNSS_qcom_wlan_nv_regulatory.bin
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+ifdef WIFI_DRIVER_REG_FILE
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_REG_FILE)
+else
+LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+endif
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
@@ -61,11 +88,13 @@ include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_cfg.ini
 LOCAL_MODULE_TAGS  := optional
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH  := $(PRODUCT_OUT)/persist
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+ifdef WLAN_CONFIG
+LOCAL_SRC_FILES    := firmware_bin/$(WLAN_CONFIG)
+else
 LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
-
 endif
+include $(BUILD_PREBUILT)
 
 # Build wlan.ko as either prima_wlan.ko or pronto_wlan.ko
 ###########################################################
@@ -104,8 +133,11 @@ $(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
         $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin; \
         ln -sf /data/misc/wifi/WCNSS_qcom_cfg.ini \
         $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_cfg.ini)
+else
+$(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
+        ln -sf /persist/WCNSS_qcom_wlan_nv.bin \
+        $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin)
 endif
 
-endif # DLKM check
-
-endif # supported target check
+endif
+endif # 8960 target check

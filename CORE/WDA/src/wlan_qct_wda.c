@@ -458,8 +458,31 @@ VOS_STATUS WDA_start(v_PVOID_t pVosContext)
       return VOS_STATUS_E_FAILURE;
    }
    /* wait for WDI start to invoke our callback */
-   status = vos_wait_single_event( &wdaContext->wdaWdiEvent,
-                                   WDA_WDI_START_TIMEOUT );
+   // IKHSS7-38339 - Motorola, a19091, -- START
+   /*status = vos_wait_single_event( &wdaContext->wdaWdiEvent,
+                                   WDA_WDI_START_TIMEOUT ); */
+   if(in_interrupt()) {
+       VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_FATAL,
+               "%s cannot be called from interrupt context!!!", __FUNCTION__);
+       VOS_ASSERT(0);
+       status = VOS_STATUS_E_FAULT;
+   } else if(NULL == &wdaContext->wdaWdiEvent) {
+       VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_FATAL,
+               "Null event used at *s!!!", __FUNCTION__);
+       VOS_ASSERT(0);
+       status = VOS_STATUS_E_FAULT;
+   } else if ( LINUX_EVENT_COOKIE != wdaContext->wdaWdiEvent.cookie ) {
+       VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_FATAL,
+           "Uninitialized event used at %s", __FUNCTION__);
+       VOS_ASSERT(0);
+       status = VOS_STATUS_E_INVAL;
+   } else {
+       long ret;
+       ret = wait_for_completion_timeout(&(wdaContext->wdaWdiEvent.complete),
+               msecs_to_jiffies(WDA_WDI_START_TIMEOUT));
+       status = ( 0 >= ret ) ? VOS_STATUS_E_TIMEOUT : VOS_STATUS_SUCCESS;
+   }
+   // IKHSS7-38339 - Motorola, a19091, -- END
    if ( !VOS_IS_STATUS_SUCCESS(status) )
    {
       if ( VOS_STATUS_E_TIMEOUT == status )
