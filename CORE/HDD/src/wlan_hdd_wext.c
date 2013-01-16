@@ -165,6 +165,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_MAX_TX_POWER  7
 #define WE_SET_HIGHER_DTIM_TRANSITION   8
 #define WE_SET_TM_LEVEL      9
+#define WE_SET_CHANNEL_RANGE 10   // Motorola, IKJBREL1-4181
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
@@ -2651,13 +2652,29 @@ static int iw_set_priv(struct net_device *dev,
                        union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    char *cmd = (char*)wrqu->data.pointer;
     int cmd_len = wrqu->data.length;
+    char* cmd = (char *)kmalloc(cmd_len+1, GFP_KERNEL); //IKHSS7-35965, a19091, Motorola
     int ret = 0;
     int status = 0;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
     ENTER();
+
+    //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+    if(cmd == NULL){
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s Malloc failed for buff of size %d - ignoring ioctl!",
+                __FUNCTION__, cmd_len);
+        status = -ENOMEM;
+        goto cleanup_and_return;
+    }
+
+    if(copy_from_user(cmd, (char*)(wrqu->data.pointer), cmd_len)) {
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user --data pointer failed! bailing",
+                __FUNCTION__);
+        status = -EFAULT;
+        goto cleanup_and_return;
+    }
+    //IKHSS7-35965, a19091, Motorola changes -- END
 
     if (ioctl_debug)
     {
@@ -2675,7 +2692,7 @@ static int iw_set_priv(struct net_device *dev,
 
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
                  "%s:LOGP in Progress. Ignore!!!",__func__);
-       return status;
+       goto cleanup_and_return; //IKHSS7-35965, a19091, Motorola
     }
 
     if(strncmp(cmd, "CSCAN",5) == 0 )
@@ -2701,7 +2718,7 @@ static int iw_set_priv(struct net_device *dev,
         {
             hddLog(VOS_TRACE_LEVEL_FATAL, "%s: START CMD Status %d", __func__, status);
         }
-        goto done;
+        goto done; //IKHSS7-35965, a19091, Motorola
     }
     else if( strcasecmp(cmd, "stop") == 0 )
     {
@@ -2715,7 +2732,7 @@ static int iw_set_priv(struct net_device *dev,
         wrqu.data.length = strlcpy(buf, "STOP", sizeof(buf));
         wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
         status = VOS_STATUS_SUCCESS;
-        goto done;
+        goto done; //IKHSS7-35965, a19091, Motorola
     }
     else if (strcasecmp(cmd, "macaddr") == 0)
     {
@@ -2768,7 +2785,10 @@ static int iw_set_priv(struct net_device *dev,
         {
             VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
                        "%s: SME Change Country code fail \n",__func__);
-            return VOS_STATUS_E_FAILURE;
+             //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+             status = VOS_STATUS_E_FAILURE;
+             goto cleanup_and_return;
+             //IKHSS7-35965, a19091, Motorola changes -- END
         }
     }
     else if( strncasecmp(cmd, "rssi", 4) == 0 )
@@ -2781,6 +2801,7 @@ static int iw_set_priv(struct net_device *dev,
 
         sscanf(ptr,"%d",&mode);
         wlan_hdd_enter_bmps(pAdapter, mode);
+		goto done;  //IKHSS7-35965, a19091, Motorola
         /*TODO:Set the power mode*/
     }
     else if (strncasecmp(cmd, "getpower", 8) == 0 ) {
@@ -2798,66 +2819,75 @@ static int iw_set_priv(struct net_device *dev,
     }
     else if( strncasecmp(cmd, "btcoexmode", 10) == 0 ) {
         hddLog( VOS_TRACE_LEVEL_INFO, "btcoexmode\n");
+        goto done;  //IKHSS7-35965, a19091, Motorola
         /*TODO: set the btcoexmode*/
     }
     else if( strcasecmp(cmd, "btcoexstat") == 0 ) {
 
         hddLog(VOS_TRACE_LEVEL_INFO, "BtCoex Status\n");
+        goto done;  //IKHSS7-35965, a19091, Motorola
         /*TODO: Return the btcoex status*/
     }
     else if( strcasecmp(cmd, "rxfilter-start") == 0 ) {
 
         hddLog(VOS_TRACE_LEVEL_INFO, "Rx Data Filter Start command\n");
+        goto done;  //IKHSS7-35965, a19091, Motorola
 
         /*TODO: Enable Rx data Filter*/
     }
     else if( strcasecmp(cmd, "rxfilter-stop") == 0 ) {
 
         hddLog(VOS_TRACE_LEVEL_INFO, "Rx Data Filter Stop command\n");
-
+        goto done;  //IKHSS7-35965, a19091, Motorola
+		
         /*TODO: Disable Rx data Filter*/
     }
     else if( strcasecmp(cmd, "rxfilter-statistics") == 0 ) {
 
         hddLog( VOS_TRACE_LEVEL_INFO, "Rx Data Filter Statistics command\n");
+		goto done;  //IKHSS7-35965, a19091, Motorola
         /*TODO: rxfilter-statistics*/
     }
     else if( strncasecmp(cmd, "rxfilter-add", 12) == 0 ) {
 
         hddLog( VOS_TRACE_LEVEL_INFO, "rxfilter-add\n");
+        goto done;  //IKHSS7-35965, a19091, Motorola		
         /*TODO: rxfilter-add*/
     }
     else if( strncasecmp(cmd, "rxfilter-remove",15) == 0 ) {
 
         hddLog( VOS_TRACE_LEVEL_INFO, "rxfilter-remove\n");
+        goto done;  //IKHSS7-35965, a19091, Motorola
         /*TODO: rxfilter-remove*/
     }
 #ifdef FEATURE_WLAN_SCAN_PNO
     else if( strncasecmp(cmd, "pnosetup", 8) == 0 ) {
         hddLog( VOS_TRACE_LEVEL_INFO, "pnosetup");
+        goto cleanup_and_return; //IKHSS7-35965, a19091, Motorola
         /*TODO: support pnosetup*/
     }
     else if( strncasecmp(cmd, "pnoforce", 8) == 0 ) {
         hddLog( VOS_TRACE_LEVEL_INFO, "pnoforce");
+        goto cleanup_and_return; //IKHSS7-35965, a19091, Motorola
         /*TODO: support pnoforce*/
     }
     else if( strncasecmp(cmd, "pno",3) == 0 ) {
 
         hddLog( VOS_TRACE_LEVEL_INFO, "pno\n");
         status = iw_set_pno(dev, info, wrqu, extra, 3);
-        return status;
+        goto cleanup_and_return; //IKHSS7-35965, a19091, Motorola
     }
     else if( strncasecmp(cmd, "rssifilter",10) == 0 ) {
 
         hddLog( VOS_TRACE_LEVEL_INFO, "rssifilter\n");
         status = iw_set_rssi_filter(dev, info, wrqu, extra, 10);
-        return status;
+        goto cleanup_and_return; //IKHSS7-35965, a19091, Motorola
     }
 #endif /*FEATURE_WLAN_SCAN_PNO*/
     else if( strncasecmp(cmd, "powerparams",11) == 0 ) {
       hddLog( VOS_TRACE_LEVEL_INFO, "powerparams\n");
       status = iw_set_power_params(dev, info, wrqu, extra, 11);
-      return status;
+      goto cleanup_and_return; //IKHSS7-35965, a19091, Motorola
     }
     else if( 0 == strncasecmp(cmd, "CONFIG-TX-TRACKING", 18) ) {
         tSirTxPerTrackingParam tTxPerTrackingParam;
@@ -2870,7 +2900,10 @@ static int iw_set_priv(struct net_device *dev,
         if (0 == tTxPerTrackingParam.ucTxPerTrackingPeriod)
         {
             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN, "Period input is not correct");
-            return VOS_STATUS_E_FAILURE;
+            //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+            status = VOS_STATUS_E_FAILURE;
+            goto cleanup_and_return;
+            //IKHSS7-35965, a19091, Motorola changes -- END
         }
 
         // use default value 5 is the input is not reasonable. in unit of 10%
@@ -2896,6 +2929,11 @@ static int iw_set_priv(struct net_device *dev,
         hddLog( VOS_TRACE_LEVEL_WARN, "%s: Unsupported GUI command %s",
                 __func__, cmd);
     }
+    //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+    if(copy_to_user((char*)(wrqu->data.pointer), cmd, cmd_len)) {
+        hddLog( VOS_TRACE_LEVEL_FATAL, "%s: COPY to user failed ... ignoring",__FUNCTION__);
+    }
+    //IKHSS7-35965, a19091, Motorola changes -- END
 done:
     /* many of the commands write information back into the command
        string using snprintf().  check the return value here in one
@@ -2911,6 +2949,12 @@ done:
        pr_info("%s: rsp [%s] len [%d] status %d\n",
                __func__, cmd, wrqu->data.length, status);
     }
+    //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+cleanup_and_return:
+    if(cmd != NULL) {
+        kfree(cmd);
+    }
+    //IKHSS7-35965, a19091, Motorola changes -- END
     return status;
 
 }
@@ -3544,9 +3588,10 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
     hdd_wext_state_t  *pWextState =  WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
-    int *value = (int *)extra;
-    int sub_cmd = value[0];
-    int set_value = value[1];
+    int cmd_len = wrqu->data.length;
+    int *value = (int *) kmalloc(cmd_len+1, GFP_KERNEL);  // Motorola, IKHSS7-39028
+    int sub_cmd;
+    int set_value;
     int ret = 0; /* success */
     int enable_pbm, enable_mp;
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -3560,6 +3605,20 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
                                   "%s:LOGP in Progress. Ignore!!!", __func__);
         return -EBUSY;
     }
+
+	    if(value == NULL)
+        return -ENOMEM;
+
+    if(copy_from_user((char *) value, (char*)(wrqu->data.pointer), cmd_len)) {
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user --data pointer failed! bailing",
+                __FUNCTION__);
+        kfree(value);
+        return -EFAULT;
+    }
+
+    sub_cmd = value[0];
+    set_value = value[1];
+    kfree(value);
 
     switch(sub_cmd)
     {
@@ -3840,7 +3899,31 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
 
            break;
         }
+		// Motorola, IKJBREL1-4181
+        case WE_SET_CHANNEL_RANGE:
+        {
+            int startChannel, endChannel;
 
+            if (set_value == 3) {
+                startChannel = 153;
+                endChannel   = 165;
+            } else if (set_value == 2) {
+                startChannel = 104;
+                endChannel   = 140;
+            } else if (set_value == 1) {
+                startChannel = 40;
+                endChannel   = 64;
+            } else {
+                set_value = 0;
+                startChannel = 1;
+                endChannel   = 11;
+            }
+
+            ret = iw_softap_set_channel_range( dev, startChannel, endChannel, set_value);
+
+            break;
+        }
+        // End IKJBREL1-4181
         default:
         {
             hddLog(LOGE, "Invalid IOCTL setvalue command %d value %d \n",
@@ -5466,13 +5549,16 @@ int wlan_hdd_set_filter(hdd_context_t *pHddCtx, tpPacketFilterCfg pRequest,
 {
     tSirRcvPktFilterCfgType    packetFilterSetReq = {0};
     tSirRcvFltPktClearParam    packetFilterClrReq = {0};
+    //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+    int retVal=0;
+    //IKHSS7-35965, a19091, Motorola changes -- END
     int i=0;
 
     if (pHddCtx->cfg_ini->disablePacketFilter)
     {
         hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Packet Filtering Disabled. Returning ",
                 __func__ );
-        return 0;
+        goto done; //IKHSS7-35965, a19091, Motorola
     }
     if (pHddCtx->isLogpInProgress)
     {
@@ -5495,7 +5581,10 @@ int wlan_hdd_set_filter(hdd_context_t *pHddCtx, tpPacketFilterCfg pRequest,
             {
                 hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Number of Params exceed Max limit %d\n",
                         __func__, pRequest->numParams);
-                return -EINVAL;
+				//IKHSS7-35965, a19091, Motorola changes -- BEGIN
+				retVal = -EINVAL;
+				goto done;
+				//IKHSS7-35965, a19091, Motorola changes -- END
             }
             packetFilterSetReq.numFieldParams = pRequest->numParams;
             packetFilterSetReq.coalesceTime = 0;
@@ -5535,7 +5624,7 @@ int wlan_hdd_set_filter(hdd_context_t *pHddCtx, tpPacketFilterCfg pRequest,
             {
                 hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Failure to execute Set Filter\n",
                         __func__);
-                return -EINVAL;
+                retVal = -EINVAL; //IKHSS7-35965, a19091, Motorola
             }
 
             break;
@@ -5549,16 +5638,22 @@ int wlan_hdd_set_filter(hdd_context_t *pHddCtx, tpPacketFilterCfg pRequest,
             {
                 hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Failure to execute Clear Filter\n",
                         __func__);
-                return -EINVAL;
+                retVal = -EINVAL; //IKHSS7-35965, a19091, Motorola
             }
             break;
 
         default :
             hddLog(VOS_TRACE_LEVEL_INFO_HIGH, "%s: Packet Filter Request: Invalid %d\n",
                     __func__, pRequest->filterAction);
-            return -EINVAL;
+            retVal = -EINVAL; //IKHSS7-35965, a19091, Motorola
     }
-    return 0;
+    //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+done:
+    if(pRequest != NULL) {
+        kfree(pRequest);
+    }
+    return retVal;
+    //IKHSS7-35965, a19091, Motorola changes -- END
 }
 
 int wlan_hdd_setIPv6Filter(hdd_context_t *pHddCtx, tANI_U8 filterType,
@@ -5784,7 +5879,23 @@ static int iw_set_packet_filter_params(struct net_device *dev, struct iw_request
         union iwreq_data *wrqu, char *extra)
 {   
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    tpPacketFilterCfg pRequest = (tpPacketFilterCfg)wrqu->data.pointer;
+
+    //IKHSS7-35965, a19091, Motorola changes -- BEGIN
+    tpPacketFilterCfg pRequest = (tpPacketFilterCfg)kmalloc(sizeof(tPacketFilterCfg), GFP_KERNEL);
+
+    if(pRequest == NULL) {
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Out of memory - cant alloc %d bytes",
+                sizeof(tpPacketFilterCfg),__FUNCTION__);
+        return -ENOMEM;
+    }
+
+    if(copy_from_user(pRequest, wrqu->data.pointer, sizeof(tPacketFilterCfg))) {
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user -- data pointer failed! bailing",
+                __FUNCTION__);
+        kfree(pRequest);
+        return -EFAULT;
+    }
+    //IKHSS7-35965, a19091, Motorola changes -- END
 
     return wlan_hdd_set_filter(WLAN_HDD_GET_CTX(pAdapter), pRequest, pAdapter->sessionId);
 }
@@ -5978,7 +6089,8 @@ void found_pref_network_cb (void *callbackContext,
   hdd_adapter_t* pAdapter = (hdd_adapter_t*)callbackContext;
   union iwreq_data wrqu;
   char buf[MAX_PNO_NOTIFY_LEN+1];
-
+  int bp = 0;
+  
   hddLog(VOS_TRACE_LEVEL_WARN, "A preferred network was found: %s with rssi: -%d",
          pPrefNetworkFoundInd->ssId.ssId, pPrefNetworkFoundInd->rssi);
 
@@ -5986,7 +6098,18 @@ void found_pref_network_cb (void *callbackContext,
   memset(&wrqu, 0, sizeof(wrqu));
   memset(buf, 0, sizeof(buf));
 
-  snprintf(buf, MAX_PNO_NOTIFY_LEN, "QCOM: Found preferred network: %s with RSSI of -%u",
+  // stop PNO
+  bp = strlcpy(buf, "0 ", sizeof(buf));
+  buf[bp++] = '\0';
+  wrqu.data.pointer = buf;
+  wrqu.data.length = strlen(buf);
+  iw_set_pno(pAdapter->dev, NULL, &wrqu, NULL, 0);
+  //printk("PNO Callback: Stopping PNO \n");
+
+  // send event to supplicant
+  memset(&wrqu, 0, sizeof(wrqu));
+  memset(buf, 0, sizeof(buf));
+  snprintf(buf, MAX_PNO_NOTIFY_LEN, "PNOFOUND : Found preferred network: %s with RSSI of -%u",
            pPrefNetworkFoundInd->ssId.ssId,
           (unsigned int)pPrefNetworkFoundInd->rssi);
 
@@ -6251,6 +6374,30 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
   {
      pnoRequest.modePNO = SIR_PNO_MODE_ON_SUSPEND;
   }
+
+  // IKHSS7-5797: set PNO intervals
+  /* A set value represents the amount of time that PNO will wait between
+     two consecutive scan procedures.
+     If the desired is for a uniform timer that fires always at the exact same
+     interval - one single value is to be set
+
+     If there is a desire for a more complex - telescopic like timer multiple
+     values can be set - once PNO reaches the end of the array it will
+     continue scanning at intervals presented by the last value
+
+     uTimerRepeat
+     How many times it should repeat that wait value
+     0 - keep using this timer until PNO is disabled/
+     e.g:   2 3
+            4 0
+    - it will wait 2s between consecutive scans for 3 times
+    - after that it will wait 4s between consecutive scans until disabled
+  */
+  pnoRequest.scanTimers.ucScanTimersCount = 2;
+  pnoRequest.scanTimers.aTimerValues[0].uTimerRepeat = 7;
+  pnoRequest.scanTimers.aTimerValues[0].uTimerValue = 45;
+  pnoRequest.scanTimers.aTimerValues[1].uTimerRepeat = 0;
+  pnoRequest.scanTimers.aTimerValues[1].uTimerValue = 480;
 
   sme_SetPreferredNetworkList(WLAN_HDD_GET_HAL_CTX(pAdapter), &pnoRequest,
                                 pAdapter->sessionId,
@@ -6756,6 +6903,11 @@ static const struct iw_priv_args we_private_args[] = {
         0, 
         "setTmLevel" },
 
+    {   WE_SET_CHANNEL_RANGE,
+        IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+        0,
+        "setChannelRange" },
+
     /* handlers for main ioctl */
     {   WLAN_PRIV_SET_NONE_GET_INT,
         0,
@@ -6936,6 +7088,7 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         0,
         "exitAP" },
+#ifdef WLAN_BTAMP_FEATURE
     {   WE_ENABLE_AMP,
         0,
         0,
@@ -6944,6 +7097,7 @@ static const struct iw_priv_args we_private_args[] = {
         0,
         0,
         "disableAMP" },
+#endif
     {   WE_ENABLE_DXE_STALL_DETECT,
         0,
         0,

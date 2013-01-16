@@ -110,7 +110,10 @@ struct statsContext
    hdd_adapter_t *pAdapter;
    unsigned int magic;
 };
-#define SAP_24GHZ_CH_COUNT (14) 
+#define SAP_24GHZ_CH_COUNT (14)
+
+#define MIN_MTU_SIZE 256     // Motorola, IKHSS7-19443, A21623, Hotspot MTU changes
+
 /*--------------------------------------------------------------------------- 
  *   Function definitions
  *-------------------------------------------------------------------------*/
@@ -208,6 +211,12 @@ int hdd_hostapd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 int hdd_hostapd_change_mtu(struct net_device *dev, int new_mtu)
 {
+//  Motorola, IKHSS7-19443, A21623, Hotspot MTU changes
+    if ( (new_mtu  < MIN_MTU_SIZE)  || (new_mtu > IEEE80211_MAX_DATA_LEN - 26) )
+        return EINVAL;
+
+    dev->mtu = new_mtu;
+//  End IKHSS7-19443
     return 0;
 }
 
@@ -795,15 +804,14 @@ VOS_STATUS hdd_hostapd_SAPEventCB( tpSap_Event pSapEvent, v_PVOID_t usrDataForCa
             break;
 
         case eSAP_MAX_ASSOC_EXCEEDED:
-            snprintf(maxAssocExceededEvent, IW_CUSTOM_MAX, "Peer %02x:%02x:%02x:%02x:%02x:%02x denied"
-                    " assoc due to Maximum Mobile Hotspot connections reached. Please disconnect"
-                    " one or more devices to enable the new device connection",
-                    pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[0],
-                    pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[1],
-                    pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[2],
-                    pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[3],
-                    pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[4],
-                    pSapEvent->sapevt.sapMaxAssocExceeded.macaddr.bytes[5]);
+            /* Beging Motorola IKHSS7-18970 fpx478, 30/03/2012, nottification to MHS */
+            /* Redefining the Custom Message
+             * IW_CUSTOM_MAX will inform when STA is denied when assoc due to Maximum Mobile
+             * Hotspot connections reached. Please disconnect one or more devices to enable
+             * the new device connection, and we dont require the MAC address of the STA
+             */
+            snprintf(maxAssocExceededEvent, IW_CUSTOM_MAX, "eSAP_MAX_ASSOC_EXCEEDED");
+            /* END IKHSS7-18970 */
             we_event = IWEVCUSTOM; /* Discovered a new node (AP mode). */
             wrqu.data.pointer = maxAssocExceededEvent;
             wrqu.data.length = strlen(maxAssocExceededEvent);
@@ -987,7 +995,7 @@ static iw_softap_setparam(struct net_device *dev,
 {
     hdd_adapter_t *pHostapdAdapter = (netdev_priv(dev));
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
-    int *value = (int *)extra;
+    int *value = (int *)(wrqu->data.pointer);
     int sub_cmd = value[0];
     int set_value = value[1];
     eHalStatus status;
@@ -1160,7 +1168,7 @@ int iw_softap_modify_acl(struct net_device *dev, struct iw_request_info *info,
 {
     hdd_adapter_t *pHostapdAdapter = (netdev_priv(dev));
     v_CONTEXT_t pVosContext = (WLAN_HDD_GET_CTX(pHostapdAdapter))->pvosContext; 
-    v_BYTE_t *value = (v_BYTE_t*)extra;
+    char *value = (char *)(wrqu->data.pointer);
     v_U8_t pPeerStaMac[VOS_MAC_ADDR_SIZE];
     int listType, cmd, i;
     int ret = 0; /* success */
@@ -1343,7 +1351,14 @@ static iw_softap_disassoc_sta(struct net_device *dev,
     /* iwpriv tool or framework calls this ioctl with
      * data passed in extra (less than 16 octets);
      */
-    peerMacAddr = (v_U8_t *)(extra);
+/*
+    if ((v_U8_t*)wrqu == (v_U8_t*)extra)
+        peerMacAddr = (v_U8_t *)(extra);
+    else
+        peerMacAddr = (v_U8_t *)(wrqu->data.pointer);
+*/
+
+    peerMacAddr = (v_U8_t *)(wrqu->data.pointer);
 
     hddLog(LOG1, "data %02x:%02x:%02x:%02x:%02x:%02x",
             peerMacAddr[0], peerMacAddr[1], peerMacAddr[2],
@@ -1654,17 +1669,18 @@ int iw_softap_get_channel_list(struct net_device *dev,
     if (eHAL_STATUS_SUCCESS != sme_GetFreqBand(hHal, &curBand))
     {
         hddLog(LOGE,FL("not able get the current frequency band\n"));
-        return -EIO;
+        //return -EIO;
+		curBand = eCSR_BAND_ALL;
     }
     wrqu->data.length = sizeof(tChannelListInfo);
     ENTER();
 
-    if (eCSR_BAND_24 == curBand)
+    if (eCSR_BAND_24 == curBand || eCSR_BAND_24 == pHddCtx->cfg_ini->nBandCapability)
     {
         bandStartChannel = RF_CHAN_1;
         bandEndChannel = RF_CHAN_14;
     }
-    else if (eCSR_BAND_5G == curBand)
+    else if (eCSR_BAND_5G == curBand || eCSR_BAND_5G == pHddCtx->cfg_ini->nBandCapability)
     {
         bandStartChannel = RF_CHAN_36;
         bandEndChannel = RF_CHAN_165;
@@ -1719,6 +1735,7 @@ int iw_softap_get_channel_list(struct net_device *dev,
     }
 
     channel_list->num_channels = num_channels;
+
     EXIT();
 
     return 0;

@@ -375,6 +375,41 @@ typedef struct nvEFSTable_s
    sHalNv     halnv;
 } nvEFSTable_t;
 nvEFSTable_t *gnvEFSTable;
+
+#ifdef WLAN_NV_OTA_UPGRADE
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   v_U32_t    nvValidityBitmap;
+   sNvFields fields;
+   sRegulatoryDomains regDomains[NUM_REG_DOMAINS];
+   sDefaultCountry defaultCountryTable;
+} nvEFSTable_reg_t;
+
+
+typedef PACKED_PRE struct PACKED_POST
+{
+   v_U32_t    nvValidityBitmap;
+   sNvFields fields;
+   tRateGroupPwr pwrOptimum[NUM_RF_SUBBANDS];
+   tTpcPowerTable plutCharacterized[NUM_RF_CHANNELS];
+   tANI_U16 plutPdadcOffset[NUM_RF_CHANNELS];
+   tRateGroupPwrVR pwrOptimum_virtualRate[NUM_RF_SUBBANDS];
+   sCalStatus calStatus;
+   sRssiChannelOffsets rssiChanOffsets[2];
+   sRFCalValues rFCalValues;
+   tANI_S16 antennaPathLoss[NUM_RF_CHANNELS];
+   tANI_S16 pktTypePwrLimits[NUM_802_11_MODES][NUM_RF_CHANNELS];
+   sOfdmCmdPwrOffset ofdmCmdPwrOffset;
+   sTxBbFilterMode txbbFilterMode;
+} nvEFSTable_cal_t;
+
+#define REG_TABLE_VALIDITY_MAP ((1<<VNV_REGULARTORY_DOMAIN_TABLE)|(1<<VNV_DEFAULT_LOCATION))
+#define CAL_TABLE_VALIDITY_MAP ((1<<VNV_RATE_TO_POWER_TABLE)|(1<<VNV_TPC_POWER_TABLE)|(1<<VNV_TPC_PDADC_OFFSETS)|(1<<VNV_TABLE_VIRTUAL_RATE)|(1<<VNV_RSSI_CHANNEL_OFFSETS)|(1<<VNV_RF_CAL_VALUES)|(1<<VNV_ANTENNA_PATH_LOSS)|(1<<VNV_PACKET_TYPE_POWER_LIMITS)|(1<<VNV_OFDM_CMD_PWR_OFFSET)|(1<<VNV_TX_BB_FILTER_MODE))
+nvEFSTable_reg_t *gnvRegTable=NULL;
+nvEFSTable_cal_t *gnvCalTable=NULL;
+#endif
+
 /* EFS Table  to send the NV structure to HAL*/ 
 static nvEFSTable_t *pnvEFSTable;
 
@@ -471,7 +506,7 @@ const sRegulatoryChannel * regChannels = nvDefaults.tables.regDomains[0].channel
 /*----------------------------------------------------------------------------
    Function Definitions and Documentation
  * -------------------------------------------------------------------------*/
-VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len);
+VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len,v_U16_t table);
 /**------------------------------------------------------------------------
   \brief vos_nv_init() - initialize the NV module
   The \a vos_nv_init() initializes the NV module.  This read the binary
@@ -488,6 +523,13 @@ VOS_STATUS vos_nv_init(void)
 VOS_STATUS vos_nv_open(void)
 {
     VOS_STATUS status = VOS_STATUS_SUCCESS;
+    #ifdef WLAN_NV_OTA_UPGRADE    
+       VOS_STATUS status_reg = VOS_STATUS_SUCCESS;
+       VOS_STATUS status_cal = VOS_STATUS_SUCCESS;
+       v_BOOL_t motoNvOta = VOS_FALSE;
+       v_SIZE_t bufSize_reg;
+       v_SIZE_t bufSize_cal;
+    #endif
     v_CONTEXT_t pVosContext= NULL;
     v_SIZE_t bufSize;
     v_SIZE_t nvReadBufSize;
@@ -506,13 +548,40 @@ VOS_STATUS vos_nv_open(void)
                                   ((VosContextType*)(pVosContext))->pHDDContext,
                                   (v_VOID_t**)&gnvEFSTable, &nvReadBufSize);
 
-    if ( (!VOS_IS_STATUS_SUCCESS( status )) || !gnvEFSTable)
+	#ifdef WLAN_NV_OTA_UPGRADE
+    bufSize_reg = sizeof(nvEFSTable_reg_t);
+    bufSize_cal = sizeof(nvEFSTable_cal_t);
+
+    status_reg = hdd_request_firmware(WLAN_NV_FILE_REGULATORY,
+                                  ((VosContextType*)(pVosContext))->pHDDContext,
+                                  (v_VOID_t**)&gnvRegTable, &bufSize_reg);
+    status_cal = hdd_request_firmware(WLAN_NV_FILE_CALIBRATION,
+                                  ((VosContextType*)(pVosContext))->pHDDContext,
+                                  (v_VOID_t**)&gnvCalTable, &bufSize_cal);
+
+    if((bufSize_reg == sizeof(nvEFSTable_reg_t)) && (bufSize_cal == sizeof(nvEFSTable_cal_t)))
     {
-         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-                   "%s: unable to download NV file %s",
-                   __func__, WLAN_NV_FILE);
-         return VOS_STATUS_E_RESOURCES;
+        if(VOS_IS_STATUS_SUCCESS(status_cal) && VOS_IS_STATUS_SUCCESS(status_cal)) {
+            motoNvOta = VOS_TRUE;
+            if(((gnvRegTable->nvValidityBitmap)&(~REG_TABLE_VALIDITY_MAP)) != 0){
+                gnvRegTable->nvValidityBitmap = REG_TABLE_VALIDITY_MAP;
+                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL, "Hypervalidity for REG! - restrict to 0x%x",
+                        gnvRegTable->nvValidityBitmap);
+            }
+            if(((gnvCalTable->nvValidityBitmap)&(~CAL_TABLE_VALIDITY_MAP)) != 0){
+                gnvCalTable->nvValidityBitmap = CAL_TABLE_VALIDITY_MAP;
+                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL, "Hypervalidity for CAL! - restrict to 0x%x",
+                        gnvCalTable->nvValidityBitmap);
+            }
+       }
     }
+    if(motoNvOta != VOS_TRUE) {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                "!!! WARNING!!!! Could not find upgradable CAL/REG table, CAL size %d, expected %d, REG size %d, expected %d",
+                bufSize_cal, sizeof(nvEFSTable_cal_t), bufSize_reg, sizeof(nvEFSTable_reg_t));
+    }
+    #endif
+
 
      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
            "INFO: NV binary file version=%d Driver default NV version=%d, continue...\n",
@@ -532,37 +601,36 @@ VOS_STATUS vos_nv_open(void)
         /*Copying the NV defaults */
         vos_mem_copy(&(pnvEFSTable->halnv),&nvDefaults,sizeof(sHalNv));
 
-        /* Size mismatch */
+        if ( (!VOS_IS_STATUS_SUCCESS( status )) || !gnvEFSTable)
+        {
+
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                   "!! ERROR !! %s: unable to download persist NV file %s - To correct - pls flash persist.img ONCE (as factory programmed)!!",
+                   __func__, WLAN_NV_FILE);
+            gnvEFSTable = pnvEFSTable;
+            nvReadBufSize = sizeof(sNvFields)+1;
+            //return VOS_STATUS_E_RESOURCES;
+        }
+       
         if ( nvReadBufSize != bufSize)
         {
-            pnvEFSTable->nvValidityBitmap = DEFAULT_NV_VALIDITY_BITMAP;
-            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
-                      "!!!WARNING: INVALID NV FILE, DRIVER IS USING DEFAULT CAL VALUES %d %d!!!",
-                      nvReadBufSize, bufSize);
-            return VOS_STATUS_SUCCESS;
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL, "!!! WARNING !!! Detected NV of size %d bytes, expected %d bytes ",
+                    nvReadBufSize, bufSize);
+            #ifdef WLAN_NV_OTA_UPGRADE
+            if(motoNvOta == VOS_TRUE && nvReadBufSize > sizeof(sNvFields)) {
+                gnvEFSTable->nvValidityBitmap = ((1 << VNV_FIELD_IMAGE)|gnvRegTable->nvValidityBitmap|gnvCalTable->nvValidityBitmap);
+                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL, "!!! CAL, REG ok ... importing MAC!");
+            } else {
+            #endif
+                pnvEFSTable->nvValidityBitmap = DEFAULT_NV_VALIDITY_BITMAP;
+                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                      "!!! USING default CAL, REL and MAC !!!");
+                goto error;
+            #ifdef WLAN_NV_OTA_UPGRADE
+            }
+            #endif
         }
-
-       /* Version mismatch */
-       if (gnvEFSTable->halnv.fields.nvVersion != WLAN_NV_VERSION)
-       {
-           if ((WLAN_NV_VERSION == NV_VERSION_11N_11AC_FW_CONFIG) &&
-               (gnvEFSTable->halnv.fields.nvVersion == NV_VERSION_11N_11AC_COUPER_TYPE))
-           {
-               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                     "!!!WARNING: Using Coupler Type field instead of Fw Config table,\n"
-                     "Make sure that this is intented or may impact performance!!!\n");
-           }
-           else
-           {
-               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                     "!!!WARNING: NV binary file version doesn't match with Driver default NV version\n"
-                     "Driver NV defaults will be used, may impact performance!!!\n");
-
-               return VOS_STATUS_SUCCESS;
-           }
-       }
-
-       pnvEFSTable->nvValidityBitmap = gnvEFSTable->nvValidityBitmap;
+        pnvEFSTable->nvValidityBitmap = gnvEFSTable->nvValidityBitmap;
         /* Copy the valid fields to the NV Global structure */ 
         if (vos_nv_getValidity(VNV_FIELD_IMAGE, &itemIsValid) == 
            VOS_STATUS_SUCCESS)
@@ -572,6 +640,13 @@ VOS_STATUS vos_nv_open(void)
                 if(vos_nv_read( VNV_FIELD_IMAGE, (v_VOID_t *)&pnvEFSTable->halnv.fields,
                    NULL, sizeof(sNvFields) ) != VOS_STATUS_SUCCESS)
                    goto error;
+                #ifdef WLAN_NV_OTA_UPGRADE
+                if(motoNvOta == VOS_TRUE) {
+                    pnvEFSTable->halnv.fields.couplerType = gnvCalTable->fields.couplerType;
+                    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                            "Coupler set to %d", pnvEFSTable->halnv.fields.couplerType);
+                }
+                #endif
             }
         }
 
@@ -580,10 +655,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_RATE_TO_POWER_TABLE, 
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum[0],
-                  NULL, sizeof(tRateGroupPwr) * NUM_RF_SUBBANDS ) != VOS_STATUS_SUCCESS)
-                    goto error;
+			   #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum[0],
+                        (v_VOID_t *)&gnvCalTable->pwrOptimum[0], sizeof(tRateGroupPwr) * NUM_RF_SUBBANDS);
+                  }
+                  else {
+               #endif
+                  if(vos_nv_read( VNV_RATE_TO_POWER_TABLE, 
+                     (v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum[0],
+                     NULL, sizeof(tRateGroupPwr) * NUM_RF_SUBBANDS ) != VOS_STATUS_SUCCESS)
+                  return (eHAL_STATUS_FAILURE);
+               #ifdef WLAN_NV_OTA_UPGRADE
+                   }
+               #endif
             }
         }
 
@@ -593,10 +679,21 @@ VOS_STATUS vos_nv_open(void)
     
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_REGULARTORY_DOMAIN_TABLE,
-                (v_VOID_t *)&pnvEFSTable->halnv.tables.regDomains[0],
-                 NULL, sizeof(sRegulatoryDomains) * NUM_REG_DOMAINS ) != VOS_STATUS_SUCCESS)
-                    goto error;
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.regDomains[0],
+                        (v_VOID_t *)&gnvRegTable->regDomains[0], sizeof(sRegulatoryDomains) * NUM_REG_DOMAINS);
+                  }
+                  else {
+               #endif
+                  if(vos_nv_read( VNV_REGULARTORY_DOMAIN_TABLE,
+                     (v_VOID_t *)&pnvEFSTable->halnv.tables.regDomains[0],
+                        NULL, sizeof(sRegulatoryDomains) * NUM_REG_DOMAINS ) != VOS_STATUS_SUCCESS)
+                   return (eHAL_STATUS_FAILURE);
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  }
+               #endif
             }
         }
 
@@ -605,10 +702,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_DEFAULT_LOCATION,
-                (v_VOID_t *)&pnvEFSTable->halnv.tables.defaultCountryTable,
-                NULL, sizeof(sDefaultCountry) ) !=  VOS_STATUS_SUCCESS)
-                    goto error;
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.defaultCountryTable,
+                        (v_VOID_t *)&gnvRegTable->defaultCountryTable, sizeof(sDefaultCountry));
+                  }
+                  else {
+               #endif
+                  if(vos_nv_read( VNV_DEFAULT_LOCATION,
+                    (v_VOID_t *)&pnvEFSTable->halnv.tables.defaultCountryTable,
+                    NULL, sizeof(sDefaultCountry) ) !=  VOS_STATUS_SUCCESS)
+                    return (eHAL_STATUS_FAILURE);
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  }
+               #endif
             }
         }
     
@@ -617,10 +725,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.plutCharacterized[0],
+                     (v_VOID_t *)&gnvCalTable->plutCharacterized[0], sizeof(tTpcPowerTable) * NUM_RF_CHANNELS );
+                  }
+                  else {
+               #endif
                 if(vos_nv_read( VNV_TPC_POWER_TABLE, 
                   (v_VOID_t *)&pnvEFSTable->halnv.tables.plutCharacterized[0],
                   NULL, sizeof(tTpcPowerTable) * NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
                     goto error;
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  }
+               #endif
             }
         }
     
@@ -629,10 +748,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_TPC_PDADC_OFFSETS,
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.plutPdadcOffset[0],
-                  NULL, sizeof(tANI_U16) * NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
-                    goto error;
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.plutPdadcOffset[0],
+                     (v_VOID_t *)&gnvCalTable->plutPdadcOffset[0], sizeof(tANI_U16) * NUM_RF_CHANNELS);
+                  }
+                  else {
+               #endif
+                  if(vos_nv_read( VNV_TPC_PDADC_OFFSETS,
+                     (v_VOID_t *)&pnvEFSTable->halnv.tables.plutPdadcOffset[0],
+                     NULL, sizeof(tANI_U16) * NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
+                     return (eHAL_STATUS_FAILURE);
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  }
+               #endif
             }
         }
         if (vos_nv_getValidity(VNV_RSSI_CHANNEL_OFFSETS, &itemIsValid) == 
@@ -640,10 +770,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_RSSI_CHANNEL_OFFSETS,
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.rssiChanOffsets[0],
-                  NULL, sizeof(sRssiChannelOffsets) * 2 ) != VOS_STATUS_SUCCESS)
-                    goto error;
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.rssiChanOffsets[0],
+                     (v_VOID_t *)&gnvCalTable->rssiChanOffsets[0], sizeof(sRssiChannelOffsets) * 2);
+                  }
+                  else {
+               #endif 
+                  if(vos_nv_read( VNV_RSSI_CHANNEL_OFFSETS,
+                     (v_VOID_t *)&pnvEFSTable->halnv.tables.rssiChanOffsets[0],
+                     NULL, sizeof(sRssiChannelOffsets) * 2 ) != VOS_STATUS_SUCCESS)
+                     return (eHAL_STATUS_FAILURE);
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  }
+               #endif
             }
         }
     
@@ -652,20 +793,20 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_HW_CAL_VALUES, (v_VOID_t *)&pnvEFSTable->halnv
-    .tables.hwCalValues, NULL, sizeof(sHwCalValues) ) != VOS_STATUS_SUCCESS)
-                    goto error;
-            }
-        }
-
-        if (vos_nv_getValidity(VNV_FW_CONFIG, &itemIsValid) == 
-         VOS_STATUS_SUCCESS)
-        {
-            if (itemIsValid == VOS_TRUE)
-            {
-                if(vos_nv_read( VNV_FW_CONFIG, (v_VOID_t *)&pnvEFSTable->halnv
-    .tables.fwConfig, NULL, sizeof(sFwConfig) ) != VOS_STATUS_SUCCESS)
-                    goto error;
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.rFCalValues,
+                     (v_VOID_t *)&gnvCalTable->rFCalValues, sizeof(sRFCalValues));
+                  }
+                 else {
+              #endif
+                if(vos_nv_read( VNV_RF_CAL_VALUES, (v_VOID_t *)&pnvEFSTable->halnv.tables.rFCalValues, NULL, sizeof(sRFCalValues) )
+                   != VOS_STATUS_SUCCESS)
+                     return (eHAL_STATUS_FAILURE);
+              #ifdef WLAN_NV_OTA_UPGRADE
+                 }
+              #endif
             }
         }
 
@@ -674,10 +815,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_ANTENNA_PATH_LOSS,
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.antennaPathLoss[0], NULL, 
-                sizeof(tANI_S16)*NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
-                    goto error;
+                #ifdef WLAN_NV_OTA_UPGRADE
+                   if(motoNvOta == VOS_TRUE)
+                   {
+                      memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.antennaPathLoss[0],
+                      (v_VOID_t *)&gnvCalTable->antennaPathLoss[0], sizeof(tANI_S16)*NUM_RF_CHANNELS);
+                   }
+                   else {
+               #endif
+                  if(vos_nv_read( VNV_ANTENNA_PATH_LOSS,
+                     (v_VOID_t *)&pnvEFSTable->halnv.tables.antennaPathLoss[0], NULL, 
+                     sizeof(tANI_S16)*NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
+                     return (eHAL_STATUS_FAILURE);
+              #ifdef WLAN_NV_OTA_UPGRADE
+                 }
+              #endif
             }
         }
         if (vos_nv_getValidity(VNV_PACKET_TYPE_POWER_LIMITS, &itemIsValid) == 
@@ -685,10 +837,21 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
-                if(vos_nv_read( VNV_PACKET_TYPE_POWER_LIMITS, 
-                  (v_VOID_t *)&pnvEFSTable->halnv.tables.pktTypePwrLimits[0], NULL, 
-                sizeof(tANI_S16)*NUM_802_11_MODES*NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
-                    goto error;
+                #ifdef WLAN_NV_OTA_UPGRADE
+                   if(motoNvOta == VOS_TRUE)
+                   {
+                      memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.pktTypePwrLimits[0][0],
+                      (v_VOID_t *)&gnvCalTable->pktTypePwrLimits[0][0], sizeof(tANI_S16)*NUM_802_11_MODES*NUM_RF_CHANNELS);
+                   }
+                   else {
+                #endif
+                   if(vos_nv_read( VNV_PACKET_TYPE_POWER_LIMITS, 
+                      (v_VOID_t *)&pnvEFSTable->halnv.tables.pktTypePwrLimits[0], NULL, 
+                      sizeof(tANI_S16)*NUM_802_11_MODES*NUM_RF_CHANNELS ) != VOS_STATUS_SUCCESS)
+                      return (eHAL_STATUS_FAILURE);
+              #ifdef WLAN_NV_OTA_UPGRADE
+                 }
+              #endif
             }
         }
 
@@ -697,11 +860,22 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.ofdmCmdPwrOffset,
+                     (v_VOID_t *)&gnvCalTable->ofdmCmdPwrOffset, sizeof(sOfdmCmdPwrOffset));
+                  }
+                  else {
+               #endif
                 if(vos_nv_read( VNV_OFDM_CMD_PWR_OFFSET, 
                   (v_VOID_t *)&pnvEFSTable->halnv.tables.ofdmCmdPwrOffset, NULL, 
                                 sizeof(sOfdmCmdPwrOffset)) != VOS_STATUS_SUCCESS)
                     goto error;
             }
+              #ifdef WLAN_NV_OTA_UPGRADE
+                 }
+              #endif
         }
 
         if (vos_nv_getValidity(VNV_TX_BB_FILTER_MODE, &itemIsValid) == 
@@ -709,22 +883,44 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE)
             {
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     memcpy((v_VOID_t *)&pnvEFSTable->halnv.tables.txbbFilterMode,
+                     (v_VOID_t *)&gnvCalTable->txbbFilterMode, sizeof(sTxBbFilterMode));
+                  }
+                 else {
+              #endif
                if(vos_nv_read(VNV_TX_BB_FILTER_MODE, 
                   (v_VOID_t *)&pnvEFSTable->halnv.tables.txbbFilterMode, NULL, 
                 sizeof(sTxBbFilterMode)) != VOS_STATUS_SUCCESS)
                    goto error;
             }
+            #ifdef WLAN_NV_OTA_UPGRADE
+               }
+            #endif
         }
         if (vos_nv_getValidity(VNV_TABLE_VIRTUAL_RATE, &itemIsValid) == 
          VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE)
             {
+               #ifdef WLAN_NV_OTA_UPGRADE
+                  if(motoNvOta == VOS_TRUE)
+                  {
+                     vos_mem_copy((v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum_virtualRate,
+                     (v_VOID_t *)&gnvCalTable->pwrOptimum_virtualRate, sizeof(gnvEFSTable->halnv.tables.pwrOptimum_virtualRate));
+                  }
+                 else {
+              #endif
                if(vos_nv_read(VNV_TABLE_VIRTUAL_RATE, 
                   (v_VOID_t *)&pnvEFSTable->halnv.tables.pwrOptimum_virtualRate, NULL, 
                 sizeof(gnvEFSTable->halnv.tables.pwrOptimum_virtualRate)) != VOS_STATUS_SUCCESS)
                    goto error;
             }
+            #ifdef WLAN_NV_OTA_UPGRADE
+               }
+            #endif
         }
     }
 
@@ -744,11 +940,42 @@ VOS_STATUS vos_nv_close(void)
     if ( !VOS_IS_STATUS_SUCCESS( status ))
     {
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                         "%s : vos_open failed\n",__func__);
+                         "%s : vos_close failed\n",__func__);
         return VOS_STATUS_E_FAILURE;
     }
+
+#ifdef WLAN_NV_OTA_UPGRADE
+    if(gnvRegTable != NULL)
+    {
+        status = hdd_release_firmware(WLAN_NV_FILE_REGULATORY, ((VosContextType*)(pVosContext))->pHDDContext);
+        if ( !VOS_IS_STATUS_SUCCESS( status ))
+        {
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                         "%s : vos_close failed\n",__func__);
+            return VOS_STATUS_E_FAILURE;
+        }
+    }
+
+    if(gnvCalTable != NULL)
+    {
+        status = hdd_release_firmware(WLAN_NV_FILE_CALIBRATION, ((VosContextType*)(pVosContext))->pHDDContext);
+        if ( !VOS_IS_STATUS_SUCCESS( status ))
+        {
+            VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                         "%s : vos_close failed\n",__func__);
+            return VOS_STATUS_E_FAILURE;
+        }
+    }
+#endif
+
     vos_mem_free(pnvEFSTable);
     gnvEFSTable=NULL;
+
+#ifdef WLAN_NV_OTA_UPGRADE
+    gnvRegTable=NULL;
+    gnvCalTable=NULL;
+#endif
+
     return VOS_STATUS_SUCCESS;
 }
 /**------------------------------------------------------------------------
@@ -1072,7 +1299,7 @@ VOS_STATUS vos_nv_setValidity( VNV_TYPE type, v_BOOL_t itemIsValid )
        if (newNvValidityBitmap != lastNvValidityBitmap)
        {
            gnvEFSTable->nvValidityBitmap = newNvValidityBitmap;
-           status = wlan_write_to_efs((v_U8_t*)gnvEFSTable,sizeof(nvEFSTable_t));
+           status = wlan_write_to_efs((v_U8_t*)gnvEFSTable,sizeof(nvEFSTable_t), 0);
            if (! VOS_IS_STATUS_SUCCESS(status)) {
                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs failed!!!\r\n"));
                status = VOS_STATUS_E_FAULT;
@@ -1369,7 +1596,34 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
 {
     VOS_STATUS status = VOS_STATUS_SUCCESS;
     v_SIZE_t itemSize;
+#ifdef WLAN_NV_OTA_UPGRADE
+    int nv_type = 0;
+    int three_files = 0;
+    VOS_STATUS status_reg = VOS_STATUS_SUCCESS;
+    VOS_STATUS status_cal = VOS_STATUS_SUCCESS;
+    v_SIZE_t bufSize_reg;
+    v_SIZE_t bufSize_cal;
+    v_CONTEXT_t pVosContext= NULL;
 
+    /*Get the global context */
+    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+    bufSize_reg = sizeof(nvEFSTable_reg_t);
+    bufSize_cal = sizeof(nvEFSTable_cal_t);
+
+    status_reg = hdd_request_firmware(WLAN_NV_FILE_REGULATORY,
+                                  ((VosContextType*)(pVosContext))->pHDDContext,
+                                  (v_VOID_t**)&gnvRegTable, &bufSize_reg);
+    status_cal = hdd_request_firmware(WLAN_NV_FILE_CALIBRATION,
+                                  ((VosContextType*)(pVosContext))->pHDDContext,
+                                  (v_VOID_t**)&gnvCalTable, &bufSize_cal);
+
+    if((bufSize_reg == sizeof(nvEFSTable_reg_t)) && (bufSize_cal == sizeof(nvEFSTable_cal_t)) && VOS_IS_STATUS_SUCCESS(status_cal) && VOS_IS_STATUS_SUCCESS(status_cal))
+    {
+            three_files = 1;
+    }
+
+#endif
     // sanity check
     if (VNV_TYPE_COUNT <= type)
     {
@@ -1401,6 +1655,14 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.fields,inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type=2;
+                        memcpy(&gnvRegTable->fields,inputVoidBuffer,bufferSize);
+                        memcpy(&gnvCalTable->fields,inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
         case VNV_RATE_TO_POWER_TABLE:
@@ -1413,6 +1675,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.pwrOptimum[0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->pwrOptimum[0],inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
         case VNV_REGULARTORY_DOMAIN_TABLE:
@@ -1425,6 +1694,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.regDomains[0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 1;
+                        memcpy(&gnvRegTable->regDomains[0],inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
         case VNV_DEFAULT_LOCATION:
@@ -1437,7 +1713,14 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.defaultCountryTable,inputVoidBuffer,bufferSize);
-            }
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 1;
+                        memcpy(&gnvRegTable->defaultCountryTable,inputVoidBuffer,bufferSize);
+                    }
+                #endif
+			}
             break;
         case VNV_TPC_POWER_TABLE:
             itemSize = sizeof(gnvEFSTable->halnv.tables.plutCharacterized);
@@ -1449,6 +1732,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.plutCharacterized[0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->plutCharacterized[0],inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
         case VNV_TPC_PDADC_OFFSETS:
@@ -1461,6 +1751,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.plutPdadcOffset[0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->plutPdadcOffset[0],inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
          case VNV_RSSI_CHANNEL_OFFSETS:
@@ -1476,6 +1773,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.rssiChanOffsets[0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->rssiChanOffsets[0],inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
          case VNV_HW_CAL_VALUES:
@@ -1490,7 +1794,14 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
                 status = VOS_STATUS_E_INVAL;
             }
             else {
-                memcpy(&gnvEFSTable->halnv.tables.hwCalValues,inputVoidBuffer,bufferSize);
+                memcpy(&gnvEFSTable->halnv.tables.rFCalValues,inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->rFCalValues,inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
         case VNV_FW_CONFIG:
@@ -1518,6 +1829,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.antennaPathLoss[0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->antennaPathLoss[0],inputVoidBuffer,bufferSize);
+                    }
+                #endif
             }
             break;
 
@@ -1530,7 +1848,14 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
                 status = VOS_STATUS_E_INVAL;
             }
             else {
-                memcpy(gnvEFSTable->halnv.tables.pktTypePwrLimits,inputVoidBuffer,bufferSize);
+                memcpy(&gnvEFSTable->halnv.tables.pktTypePwrLimits[0][0],inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                if(three_files == 1)
+                {
+                    nv_type = 2;
+                    memcpy(&gnvCalTable->pktTypePwrLimits[0][0],inputVoidBuffer,bufferSize);
+                }
+                #endif
             }
             break;
 
@@ -1544,6 +1869,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.ofdmCmdPwrOffset,inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                if(three_files == 1)
+                {
+                    nv_type = 2;
+                    memcpy(&gnvCalTable->ofdmCmdPwrOffset,inputVoidBuffer,bufferSize);
+                }
+                #endif
             }
             break;
 
@@ -1557,6 +1889,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.txbbFilterMode,inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                if(three_files == 1)
+                {
+                    nv_type = 2;
+                    memcpy(&gnvCalTable->txbbFilterMode,inputVoidBuffer,bufferSize);
+                }
+                #endif
             }
             break;
             
@@ -1571,6 +1910,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             }
             else {
                 memcpy(&gnvEFSTable->halnv.tables.pwrOptimum_virtualRate,inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                if(three_files == 1)
+                {
+                    nv_type = 2;
+                    memcpy(&gnvCalTable->pwrOptimum_virtualRate,inputVoidBuffer,bufferSize);
+                }
+                #endif
             }
             break;
 
@@ -1585,12 +1931,38 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_setValidity failed!!!\r\n"));
           status = VOS_STATUS_E_FAULT;
       }
-      status = wlan_write_to_efs((v_U8_t*)gnvEFSTable,sizeof(nvEFSTable_t));
+      status = wlan_write_to_efs((v_U8_t*)gnvEFSTable,sizeof(nvEFSTable_t),0);
 
       if (! VOS_IS_STATUS_SUCCESS(status)) {
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs failed!!!\r\n"));
           status = VOS_STATUS_E_FAULT;
       }
+	  
+      #ifdef WLAN_NV_OTA_UPGRADE
+      if(three_files == 1)
+      {
+          if(nv_type == 1)
+          {
+              vos_sleep(100);
+              status = wlan_write_to_efs((v_U8_t*)gnvRegTable,sizeof(nvEFSTable_reg_t),nv_type);
+
+              if (! VOS_IS_STATUS_SUCCESS(status)) {
+                  VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs reg failed!!!\r\n"));
+                  status = VOS_STATUS_E_FAULT;
+                  }
+          }
+          else if(nv_type == 2)
+          {
+              vos_sleep(100);
+              status = wlan_write_to_efs((v_U8_t*)gnvCalTable,sizeof(nvEFSTable_cal_t),nv_type);
+
+              if (! VOS_IS_STATUS_SUCCESS(status)) {
+                  VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs cal failed!!!\r\n"));
+                         status = VOS_STATUS_E_FAULT;
+                        }
+              }
+      }
+      #endif
    }
    return status;
 }

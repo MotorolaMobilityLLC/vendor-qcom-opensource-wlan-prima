@@ -172,6 +172,7 @@ static struct wake_lock wlan_wake_lock;
 #endif
 /* set when SSR is needed after unload */
 static e_hdd_ssr_required isSsrRequired = HDD_SSR_NOT_REQUIRED;
+static struct wake_lock wlan_wake_lock_scan; //Mot IKHSS7-28961: Incorrect empty scan results
 
 //internal function declaration
 static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx);
@@ -2736,6 +2737,27 @@ VOS_STATUS hdd_release_firmware(char *pFileName,v_VOID_t *pCtx)
 
    }
 
+#ifdef WLAN_NV_OTA_UPGRADE /* Motorola OTA changes */
+   else if (!strcmp(WLAN_NV_FILE_REGULATORY,pFileName)) {
+       if(pHddCtx->nv_reg) {
+          release_firmware(pHddCtx->nv_reg);
+          pHddCtx->nv_reg = NULL;
+       }
+       else
+          status = VOS_STATUS_E_FAILURE;
+
+   }
+   else if (!strcmp(WLAN_NV_FILE_CALIBRATION,pFileName)) {
+       if(pHddCtx->nv_cal) {
+          release_firmware(pHddCtx->nv_cal);
+          pHddCtx->nv_cal = NULL;
+       }
+       else
+          status = VOS_STATUS_E_FAILURE;
+
+   }
+#endif
+ 
    EXIT();
    return status;
 }
@@ -2798,6 +2820,41 @@ VOS_STATUS hdd_request_firmware(char *pfileName,v_VOID_t *pCtx,v_VOID_t **ppfw_d
                  __func__, *pSize);
        }
    }
+
+   #ifdef WLAN_NV_OTA_UPGRADE /* Motorola OTA changes */
+   else if(!strcmp(WLAN_NV_FILE_REGULATORY, pfileName)) {
+
+       status = request_firmware(&pHddCtx->nv_reg, pfileName, pHddCtx->parent_dev);
+
+       if(status || !pHddCtx->nv_reg || !pHddCtx->nv_reg->data) {
+           hddLog(VOS_TRACE_LEVEL_FATAL, "%s: nv %s download failed",
+                  __func__, pfileName);
+           retval = VOS_STATUS_E_FAILURE;
+       }
+       else {
+         *ppfw_data = (v_VOID_t *)pHddCtx->nv_reg->data;
+         *pSize = pHddCtx->nv_reg->size;
+          hddLog(VOS_TRACE_LEVEL_INFO, "%s: nv file size = %d",
+                 __func__, *pSize);
+       }
+   }
+   else if(!strcmp(WLAN_NV_FILE_CALIBRATION, pfileName)) {
+
+       status = request_firmware(&pHddCtx->nv_cal, pfileName, pHddCtx->parent_dev);
+
+       if(status || !pHddCtx->nv_cal || !pHddCtx->nv_cal->data) {
+           hddLog(VOS_TRACE_LEVEL_FATAL, "%s: nv %s download failed",
+                  __func__, pfileName);
+           retval = VOS_STATUS_E_FAILURE;
+       }
+       else {
+         *ppfw_data = (v_VOID_t *)pHddCtx->nv_cal->data;
+         *pSize = pHddCtx->nv_cal->size;
+          hddLog(VOS_TRACE_LEVEL_INFO, "%s: nv file size = %d",
+                 __func__, *pSize);
+       }
+   }
+   #endif
 
    EXIT();
    return retval;
@@ -5162,6 +5219,13 @@ void hdd_allow_suspend(void)
 #endif
 }
 
+//Begin Mot IKHSS7-28961 : Incorrect emtpty scan results because of againg out
+void hdd_prevent_suspend_after_scan(long hz)
+{
+  wake_lock_timeout(&wlan_wake_lock_scan, hz);
+}
+//END IKHSS7-28961
+
 void hdd_allow_suspend_timeout(v_U32_t timeout)
 {
 #ifdef WLAN_OPEN_SOURCE
@@ -5826,7 +5890,7 @@ int hdd_wlan_startup(struct device *dev )
       /* Action frame registered in one adapter which will
        * applicable to all interfaces 
        */
-      wlan_hdd_cfg80211_post_voss_start(pAdapter);
+      wlan_hdd_cfg80211_post_voss_start(pP2pAdapter);
    }
 
    mutex_init(&pHddCtx->sap_lock);
@@ -5960,6 +6024,7 @@ static int hdd_driver_init( void)
 
 #ifdef WLAN_OPEN_SOURCE
    wake_lock_init(&wlan_wake_lock, WAKE_LOCK_SUSPEND, "wlan");
+   wake_lock_init(&wlan_wake_lock_scan, WAKE_LOCK_SUSPEND, "wlan_scan"); //Mot IKHSS7-28961: Incorrect empty scan
 #endif
 
    pr_info("%s: loading driver v%s\n", WLAN_MODULE_NAME,
@@ -6075,6 +6140,7 @@ static int hdd_driver_init( void)
 
 #ifdef WLAN_OPEN_SOURCE
       wake_lock_destroy(&wlan_wake_lock);
+      wake_lock_destroy(&wlan_wake_lock_scan); //Mot IKHSS7-28961: Incorrect empty scan results
 #endif
       pr_err("%s: driver load failure\n", WLAN_MODULE_NAME);
    }
@@ -6190,6 +6256,7 @@ static void hdd_driver_exit(void)
 done:
 #ifdef WLAN_OPEN_SOURCE
    wake_lock_destroy(&wlan_wake_lock);
+   wake_lock_destroy(&wlan_wake_lock_scan); //Mot IKHSS7-28961: Incorrect empty scan results
 #endif
    pr_info("%s: driver unloaded\n", WLAN_MODULE_NAME);
 }

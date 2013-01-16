@@ -2180,6 +2180,11 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
 
     pScanInfo =  &pHddCtx->scan_info;
 
+    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, "%s:LOGP in Progress. Ignore!!!",__func__);
+        return -EAGAIN;
+    }
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: device_mode = %d\n",
                               __func__,pAdapter->device_mode);
 
@@ -3265,8 +3270,12 @@ static int wlan_hdd_cfg80211_add_key( struct wiphy *wiphy,
             vos_mem_copy(&pAPCtx->groupKey, &setKey, sizeof(tCsrRoamSetKey));
         }
     }
-    else if ( (pAdapter->device_mode == WLAN_HDD_INFRA_STATION) ||
-              (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT) )
+    else if ( (pAdapter->device_mode == WLAN_HDD_INFRA_STATION) 
+#ifdef WLAN_FEATURE_P2P
+            || (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
+			|| (pAdapter->device_mode == WLAN_HDD_P2P_DEVICE)
+#endif
+            )
     {
         hdd_wext_state_t *pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
         hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
@@ -4223,7 +4232,6 @@ static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
     if (!req)
     {
         hddLog(VOS_TRACE_LEVEL_ERROR, "request is became NULL\n");
-        pScanInfo->mScanPending = VOS_FALSE;
         goto allow_suspend;
     }
 
@@ -4242,6 +4250,11 @@ static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
      * cfg80211_scan_done informing NL80211 about completion
      * of scanning
      */
+    //Begin Mot IKHSS7-28961 : Dont allow sleep so that supplicant
+    // can fetch scan results before kerenel ages it out if slept immediately
+    // and sleep duration is more than the ageout time.
+    hdd_prevent_suspend_after_scan(HZ/4);
+   //END IKHSS7-28961
     cfg80211_scan_done(req, false);
     complete(&pScanInfo->abortscan_event_var);
 
@@ -4470,12 +4483,21 @@ int wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
          * Becasue of this, driver is assuming that this is not wildcard scan and so
          * is not aging out the scan results.
          */
-        if (request->ssids && '\0' == request->ssids->ssid[0])
-        {
+        /* Motorola - support passive scan for autonomous mode - START */
+        if (NULL == request->ssids) {
+            request->n_ssids = -1;
+        /* Motorola - support passive scan for autonomous mode - END */
+        } else if ('\0' == request->ssids->ssid[0]) {
             request->n_ssids = 0;
         }
-
-        if ((request->ssids) && (0 < request->n_ssids))
+        /* Motorola - support passive scan for autonomous mode - START */
+        if (-1 == request->n_ssids) {
+            scanRequest.scanType = eSIR_PASSIVE_SCAN;
+            scanRequest.minChnTime = cfg_param->nPassiveMinChnTime;
+            scanRequest.maxChnTime = cfg_param->nPassiveMaxChnTime;
+            hddLog(VOS_TRACE_LEVEL_INFO, "requesting PASSIVE SCAN");
+        /* Motorola - support passive scan for autonomous mode - END */
+        } else if (0 < request->n_ssids)
         {
             tCsrSSIDInfo *SsidInfo;
             int j;
@@ -4505,19 +4527,23 @@ int wlan_hdd_cfg80211_scan( struct wiphy *wiphy,
             }
             /* set the scan type to active */
             scanRequest.scanType = eSIR_ACTIVE_SCAN;
+            scanRequest.minChnTime = cfg_param->nActiveMinChnTime;
+            scanRequest.maxChnTime = cfg_param->nActiveMaxChnTime;
         }
         else if(WLAN_HDD_P2P_GO == pAdapter->device_mode)
         {
             /* set the scan type to active */
             scanRequest.scanType = eSIR_ACTIVE_SCAN;
+            scanRequest.minChnTime = cfg_param->nActiveMinChnTime;
+            scanRequest.maxChnTime = cfg_param->nActiveMaxChnTime;
         }
         else
         {
             /*Set the scan type to default type, in this case it is ACTIVE*/
             scanRequest.scanType = pScanInfo->scan_mode;
+            scanRequest.minChnTime = cfg_param->nActiveMinChnTime;
+            scanRequest.maxChnTime = cfg_param->nActiveMaxChnTime;
         }
-        scanRequest.minChnTime = cfg_param->nActiveMinChnTime;
-        scanRequest.maxChnTime = cfg_param->nActiveMaxChnTime;
     }
     else
     {
