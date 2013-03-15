@@ -1027,12 +1027,9 @@ void csr_SetRevision(tpAniSirGlobal pMac, tANI_U8 revision)
 }
 
 /*
- This function flushes the roam scan cache and creates fresh cache
- based on the input channel list
+ This function flushes the roam scan cache
 */
-eHalStatus csrFlushAndCreateBgScanRoamChannelList(tpAniSirGlobal pMac,
-                                                  const tANI_U8 *pChannelList,
-                                                  const tANI_U8 numChannels)
+eHalStatus csrFlushBgScanRoamChannelList(tpAniSirGlobal pMac)
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
@@ -1042,7 +1039,24 @@ eHalStatus csrFlushAndCreateBgScanRoamChannelList(tpAniSirGlobal pMac,
     {
         vos_mem_free(pNeighborRoamInfo->cfgParams.channelInfo.ChannelList);
         pNeighborRoamInfo->cfgParams.channelInfo.ChannelList = NULL;
+        pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels = 0;
     }
+    return status;
+}
+
+
+
+/*
+ This function flushes the roam scan cache and creates fresh cache
+ based on the input channel list
+*/
+eHalStatus csrCreateBgScanRoamChannelList(tpAniSirGlobal pMac,
+                                          const tANI_U8 *pChannelList,
+                                          const tANI_U8 numChannels)
+{
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
+
     pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels = numChannels;
 
     pNeighborRoamInfo->cfgParams.channelInfo.ChannelList =
@@ -1100,7 +1114,8 @@ eHalStatus csrUpdateBgScanConfigIniChannelList(tpAniSirGlobal pMac,
                 ChannelList[outNumChannels++] = inPtr[i];
             }
         }
-        csrFlushAndCreateBgScanRoamChannelList(pMac, ChannelList, outNumChannels);
+        csrFlushBgScanRoamChannelList(pMac);
+        csrCreateBgScanRoamChannelList(pMac, ChannelList, outNumChannels);
     }
     else if (eCSR_BAND_5G == eBand)
     {
@@ -1114,7 +1129,8 @@ eHalStatus csrUpdateBgScanConfigIniChannelList(tpAniSirGlobal pMac,
                ChannelList[outNumChannels++] = inPtr[i];
             }
         }
-        csrFlushAndCreateBgScanRoamChannelList(pMac, ChannelList, outNumChannels);
+        csrFlushBgScanRoamChannelList(pMac);
+        csrCreateBgScanRoamChannelList(pMac, ChannelList, outNumChannels);
     }
     else if (eCSR_BAND_ALL == eBand)
     {
@@ -1126,7 +1142,8 @@ eHalStatus csrUpdateBgScanConfigIniChannelList(tpAniSirGlobal pMac,
                ChannelList[outNumChannels++] = inPtr[i];
             }
         }
-        csrFlushAndCreateBgScanRoamChannelList(pMac, ChannelList, outNumChannels);
+        csrFlushBgScanRoamChannelList(pMac);
+        csrCreateBgScanRoamChannelList(pMac, ChannelList, outNumChannels);
     }
     else
     {
@@ -1519,6 +1536,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         smsLog( pMac, LOG1, "nImmediateRoamRssiDiff = %d",
                 pMac->roam.configParam.nImmediateRoamRssiDiff );
         pMac->roam.configParam.nRoamPrefer5GHz = pParam->nRoamPrefer5GHz;
+        pMac->roam.configParam.isWESModeEnabled = pParam->isWESModeEnabled;
 #endif
 #ifdef FEATURE_WLAN_LFR 
         pMac->roam.configParam.isFastRoamIniFeatureEnabled = pParam->isFastRoamIniFeatureEnabled;
