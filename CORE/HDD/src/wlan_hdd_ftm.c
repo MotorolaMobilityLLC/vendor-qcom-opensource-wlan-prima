@@ -2043,7 +2043,6 @@ int wlan_hdd_ftm_set_nv_field
    v_SIZE_t           nvSize;
    sHalNv            *nvContents = NULL;
    v_U8_t             macLoop;
-   v_U8_t            *pNVMac = NULL;
    /* IKLOCSEN-715 START Support WLAN Multi MAC Programming */
    v_U8_t             macOctet;
    v_BOOL_t           isBlankMac = VOS_FALSE;
@@ -2088,9 +2087,19 @@ int wlan_hdd_ftm_set_nv_field
          /* IKLOCSEN-715 START Support WLAN Multi MAC Programming */
          for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
          {
+            v_U8_t *pNVMac =
+                macLoop == 0 ? (v_U8_t *)nvContents->fields.macAddr  :
+                macLoop == 1 ? (v_U8_t *)nvContents->fields.macAddr2 :
+                macLoop == 2 ? (v_U8_t *)nvContents->fields.macAddr3 :
+                               (v_U8_t *)nvContents->fields.macAddr4;
+            v_U8_t *macPtr =
+                macLoop == 0 ? (v_U8_t *)nvField->fieldData.macAddr  :
+                macLoop == 1 ? (v_U8_t *)nvField->fieldData.macAddr2 :
+                macLoop == 2 ? (v_U8_t *)nvField->fieldData.macAddr3 :
+                               (v_U8_t *)nvField->fieldData.macAddr4;
             isBlankMac = VOS_TRUE;
             for(macOctet = 0; macOctet < VOS_MAC_ADDRESS_LEN ; macOctet++) {
-                if(nvField->fieldData.macAddr[(macLoop*NV_FIELD_MAC_ADDR_SIZE) + macOctet] !=0){
+                if(macPtr[macOctet] !=0){
                     isBlankMac = VOS_FALSE;
                     break;
                 }
@@ -2098,16 +2107,9 @@ int wlan_hdd_ftm_set_nv_field
             if(isBlankMac == VOS_FALSE) {
                 // MAC to be programmed!
                 VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
-                        "Writing MAC #%x, MAC = 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x",
-                        macLoop, nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN],
-                        nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN+1],
-                        nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN+2],
-                        nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN+3],
-                        nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN+4],
-                        nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN+5]);
-            vos_mem_copy(pNVMac + (macLoop * NV_FIELD_MAC_ADDR_SIZE),
-                        &nvField->fieldData.macAddr[macLoop*VOS_MAC_ADDRESS_LEN],
-                         NV_FIELD_MAC_ADDR_SIZE);
+                        "Writing MAC #%x, MAC = %02x:%02x:%02x:%02x:%02x:%02x",
+                        macLoop, macPtr[0], macPtr[1], macPtr[2], macPtr[3], macPtr[4], macPtr[5]);
+                vos_mem_copy(pNVMac, macPtr, NV_FIELD_MAC_ADDR_SIZE);
             }
          }
          /* IKLOCSEN-715 STOP Support WLAN Multi MAC Programming */
