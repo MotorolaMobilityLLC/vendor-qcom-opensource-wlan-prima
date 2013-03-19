@@ -7852,7 +7852,7 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
           break;
         case eWNI_SME_UPPER_LAYER_ASSOC_CNF:
         {
-            tCsrRoamSession  *pSession;
+            tCsrRoamSession  *pSession = NULL;
             tSirSmeAssocIndToUpperLayerCnf *pUpperLayerAssocCnf;
             tCsrRoamInfo roamInfo;
             tCsrRoamInfo *pRoamInfo = NULL;
@@ -7863,7 +7863,8 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             pRoamInfo = &roamInfo;
             pUpperLayerAssocCnf = (tSirSmeAssocIndToUpperLayerCnf *)pMsgBuf;
             status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pUpperLayerAssocCnf->bssId, &sessionId );
-            pSession = CSR_GET_SESSION(pMac, sessionId);
+            if (status == eHAL_STATUS_SUCCESS)
+                pSession = CSR_GET_SESSION(pMac, sessionId);
 
             if(!pSession)
             {
