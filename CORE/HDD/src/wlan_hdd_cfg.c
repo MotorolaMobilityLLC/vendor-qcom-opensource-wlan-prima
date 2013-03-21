@@ -102,6 +102,18 @@ static void cbNotifySetWESMode(hdd_context_t *pHddCtx, unsigned long NotifyId)
     // at the point this routine is called, the value in the cfg_ini table has already been updated
     sme_UpdateWESMode((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->isWESModeEnabled);
 }
+
+static void cbNotifySetRoamIntraBand(hdd_context_t *pHddCtx, unsigned long NotifyId)
+{
+    sme_setRoamIntraBand((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nRoamIntraBand);
+}
+#endif
+
+#ifdef FEATURE_WLAN_OKC
+static void cbNotifySetOkcFeatureEnabled(hdd_context_t *pHddCtx, unsigned long NotifyId)
+{
+    // at the point this routine is called, the value in the cfg_ini table has already been updated
+}
 #endif
 
 #ifdef FEATURE_WLAN_LFR
@@ -133,6 +145,12 @@ static void cbNotifySetNeighborLookupRssiThreshold(hdd_context_t *pHddCtx, unsig
     sme_setNeighborLookupRssiThreshold((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nNeighborLookupRssiThreshold );
 }
 
+static void cbNotifySetNeighborScanPeriod(hdd_context_t *pHddCtx, unsigned long NotifyId)
+{
+    // at the point this routine is called, the value in the cfg_ini table has already been updated
+    sme_setNeighborScanPeriod((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nNeighborScanPeriod );
+}
+
 static void cbNotifySetNeighborResultsRefreshPeriod(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
     // at the point this routine is called, the value in the cfg_ini table has already been updated
@@ -143,6 +161,18 @@ static void cbNotifySetEmptyScanRefreshPeriod(hdd_context_t *pHddCtx, unsigned l
 {
     // at the point this routine is called, the value in the cfg_ini table has already been updated
     sme_UpdateEmptyScanRefreshPeriod((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nEmptyScanRefreshPeriod);
+}
+
+static void cbNotifySetNeighborScanMinChanTime(hdd_context_t *pHddCtx, unsigned long NotifyId)
+{
+    // at the point this routine is called, the value in the cfg_ini table has already been updated
+    sme_setNeighborScanMinChanTime((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nNeighborScanMinChanTime);
+}
+
+static void cbNotifySetNeighborScanMaxChanTime(hdd_context_t *pHddCtx, unsigned long NotifyId)
+{
+    // at the point this routine is called, the value in the cfg_ini table has already been updated
+    sme_setNeighborScanMaxChanTime((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nNeighborScanMaxChanTime);
 }
 #endif
 
@@ -1044,6 +1074,15 @@ REG_TABLE_ENTRY g_registry_table[] =
                          CFG_ENABLE_WES_MODE_NAME_MAX,
                          cbNotifySetWESMode, 0),
 #endif
+#ifdef FEATURE_WLAN_OKC
+   REG_DYNAMIC_VARIABLE( CFG_OKC_FEATURE_ENABLED_NAME, WLAN_PARAM_Integer,
+                 hdd_config_t, isOkcIniFeatureEnabled,
+                 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                 CFG_OKC_FEATURE_ENABLED_DEFAULT,
+                 CFG_OKC_FEATURE_ENABLED_MIN,
+                 CFG_OKC_FEATURE_ENABLED_MAX,
+                 cbNotifySetOkcFeatureEnabled, 0 ),
+#endif
 
    REG_VARIABLE( CFG_QOS_WMM_PKT_CLASSIFY_BASIS_NAME , WLAN_PARAM_Integer,
                  hdd_config_t, PktClassificationBasis,
@@ -1419,12 +1458,13 @@ REG_TABLE_ENTRY g_registry_table[] =
 #endif
 
 #ifdef WLAN_FEATURE_NEIGHBOR_ROAMING
-   REG_VARIABLE( CFG_NEIGHBOR_SCAN_TIMER_PERIOD_NAME, WLAN_PARAM_Integer,
+   REG_DYNAMIC_VARIABLE( CFG_NEIGHBOR_SCAN_TIMER_PERIOD_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nNeighborScanPeriod,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_NEIGHBOR_SCAN_TIMER_PERIOD_DEFAULT,
                  CFG_NEIGHBOR_SCAN_TIMER_PERIOD_MIN,
-                 CFG_NEIGHBOR_SCAN_TIMER_PERIOD_MAX ),
+                 CFG_NEIGHBOR_SCAN_TIMER_PERIOD_MAX,
+                 cbNotifySetNeighborScanPeriod, 0 ),
 
    REG_VARIABLE( CFG_NEIGHBOR_REASSOC_RSSI_THRESHOLD_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nNeighborReassocRssiThreshold,
@@ -1446,19 +1486,21 @@ REG_TABLE_ENTRY g_registry_table[] =
                         VAR_FLAGS_OPTIONAL,
                         (void *)CFG_NEIGHBOR_SCAN_CHAN_LIST_DEFAULT ),
 
-   REG_VARIABLE( CFG_NEIGHBOR_SCAN_MIN_CHAN_TIME_NAME, WLAN_PARAM_Integer,
+   REG_DYNAMIC_VARIABLE( CFG_NEIGHBOR_SCAN_MIN_CHAN_TIME_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nNeighborScanMinChanTime,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_NEIGHBOR_SCAN_MIN_CHAN_TIME_DEFAULT,
                  CFG_NEIGHBOR_SCAN_MIN_CHAN_TIME_MIN,
-                 CFG_NEIGHBOR_SCAN_MIN_CHAN_TIME_MAX ),
+                 CFG_NEIGHBOR_SCAN_MIN_CHAN_TIME_MAX,
+                 cbNotifySetNeighborScanMinChanTime, 0 ),
 
-   REG_VARIABLE( CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_NAME, WLAN_PARAM_Integer,
+   REG_DYNAMIC_VARIABLE( CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nNeighborScanMaxChanTime,
                  VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
                  CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_DEFAULT,
                  CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_MIN,
-                 CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_MAX ),
+                 CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_MAX,
+                 cbNotifySetNeighborScanMaxChanTime, 0 ),
 
    REG_VARIABLE( CFG_11R_NEIGHBOR_REQ_MAX_TRIES_NAME, WLAN_PARAM_Integer,
                  hdd_config_t, nMaxNeighborReqTries,
@@ -1829,6 +1871,15 @@ REG_TABLE_ENTRY g_registry_table[] =
                        CFG_ROAM_PREFER_5GHZ_MIN,
                        CFG_ROAM_PREFER_5GHZ_MAX,
                        cbNotifySetRoamPrefer5GHz, 0 ),
+
+ REG_DYNAMIC_VARIABLE( CFG_ROAM_INTRA_BAND, WLAN_PARAM_Integer,
+                       hdd_config_t, nRoamIntraBand,
+                       VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                       CFG_ROAM_INTRA_BAND_DEFAULT,
+                       CFG_ROAM_INTRA_BAND_MIN,
+                       CFG_ROAM_INTRA_BAND_MAX,
+                       cbNotifySetRoamIntraBand, 0 ),
+
 #endif
 
  REG_VARIABLE( CFG_P2P_DEVICE_ADDRESS_ADMINISTRATED_NAME, WLAN_PARAM_Integer,
@@ -2419,6 +2470,9 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [RoamRssiDiff] Value = [%lu] ",pHddCtx->cfg_ini->RoamRssiDiff);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [ImmediateRoamRssiDiff] Value = [%lu] ",pHddCtx->cfg_ini->nImmediateRoamRssiDiff);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [isWESModeEnabled] Value = [%lu] ",pHddCtx->cfg_ini->isWESModeEnabled);
+#endif
+#ifdef FEATURE_WLAN_OKC
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [OkcEnabled] Value = [%lu] ",pHddCtx->cfg_ini->isOkcIniFeatureEnabled);
 #endif
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraDirAcVo] Value = [%u] ",pHddCtx->cfg_ini->InfraDirAcVo);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [InfraNomMsduSizeAcVo] Value = [0x%x] ",pHddCtx->cfg_ini->InfraNomMsduSizeAcVo);
@@ -3709,6 +3763,7 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig.csrConfig.fEnableDFSChnlScan        = pConfig->enableDFSChnlScan;
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
    smeConfig.csrConfig.nRoamPrefer5GHz           = pConfig->nRoamPrefer5GHz;
+   smeConfig.csrConfig.nRoamIntraBand            = pConfig->nRoamIntraBand;
 #endif
    smeConfig.csrConfig.fFirstScanOnly2GChnl      = pConfig->enableFirstScan2GOnly;
 
@@ -4036,4 +4091,31 @@ VOS_STATUS hdd_execute_config_command(hdd_context_t *pHddCtx, char *command)
  done:
    kfree(clone);
    return vstatus;
+}
+
+/**---------------------------------------------------------------------------
+
+  \brief hdd_is_okc_mode_enabled() -
+
+   This function returns whether OKC mode is enabled or not
+
+  \param - pHddCtx - Pointer to the HDD Adapter.
+
+  \return - 1 for enabled, zero for disabled
+
+  --------------------------------------------------------------------------*/
+
+tANI_BOOLEAN hdd_is_okc_mode_enabled(hdd_context_t *pHddCtx)
+{
+    if (NULL == pHddCtx)
+    {
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: pHddCtx is NULL", __func__);
+        return -EINVAL;
+    }
+
+#ifdef FEATURE_WLAN_OKC
+    return pHddCtx->cfg_ini->isOkcIniFeatureEnabled;
+#else
+    return eANI_BOOLEAN_FALSE;
+#endif
 }
