@@ -188,6 +188,9 @@ typedef enum
     eCsrForcedDisassocSta,
     eCsrForcedDeauthSta,
     eCsrPerformPreauth,
+    eCsrLostLink1Abort,
+    eCsrLostLink2Abort,
+    eCsrLostLink3Abort,
 
 }eCsrRoamReason;
 
@@ -1068,6 +1071,11 @@ typedef struct tagCsrRoamStruct
 #define CSR_IS_ADDTS_WHEN_ACMOFF_SUPPORTED(pMac) (pMac->roam.configParam.addTSWhenACMIsOff)
 // DEAUTHIND
 #define CSR_IS_LOSTLINK_ROAMING(reason)  ((eCsrLostlinkRoamingDisassoc == (reason)) || (eCsrLostlinkRoamingDeauth == (reason)))
+
+#define CSR_IS_ROAMING_COMMAND(pCommand) ((eCsrLostLink1 == (pCommand)->u.roamCmd.roamReason) ||\
+                                          (eCsrLostLink2 == (pCommand)->u.roamCmd.roamReason) ||\
+                                          (eCsrLostLink3 == (pCommand)->u.roamCmd.roamReason) )
+
 
 //Stop CSR from asking for IMPS, This function doesn't disable IMPS from CSR
 void csrScanSuspendIMPS( tpAniSirGlobal pMac );
