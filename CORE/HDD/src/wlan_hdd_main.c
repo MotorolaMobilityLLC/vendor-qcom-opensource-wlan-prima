@@ -938,7 +938,7 @@ VOS_STATUS hdd_parse_countryrev(tANI_U8 *pValue, tANI_U8 *pCountryCode, tANI_U8 
     }
 
     /*getting the first argument ie the country code */
-    sscanf(inPtr, "%s ", pCountryCode);
+    sscanf(inPtr, "%3s ", pCountryCode);
 
     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
                "Country code is : %s", pCountryCode);
@@ -1026,7 +1026,7 @@ VOS_STATUS hdd_parse_channellist(tANI_U8 *pValue, tANI_U8 *pChannelList, tANI_U8
     }
 
     /*getting the first argument ie the number of channels*/
-    sscanf(inPtr, "%s ", buf);
+    sscanf(inPtr, "%32s ", buf);
     v = kstrtos32(buf, 10, &tempInt);
     if ((v < 0) || (tempInt <= 0)) return -EINVAL;
 
@@ -4937,10 +4937,10 @@ void wlan_hdd_set_concurrency_mode(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
 {
    switch(mode)
    {
-       case WLAN_HDD_INFRA_STATION:
-       case WLAN_HDD_P2P_CLIENT:
-       case WLAN_HDD_P2P_GO:
-       case WLAN_HDD_SOFTAP:
+       case VOS_STA_MODE:
+       case VOS_P2P_CLIENT_MODE:
+       case VOS_P2P_GO_MODE:
+       case VOS_STA_SAP_MODE:
             pHddCtx->concurrency_mode |= (1 << mode);
             pHddCtx->no_of_sessions[mode]++;
             break;
@@ -4957,10 +4957,10 @@ void wlan_hdd_clear_concurrency_mode(hdd_context_t *pHddCtx, tVOS_CON_MODE mode)
 {
    switch(mode)
    {
-       case WLAN_HDD_INFRA_STATION:
-       case WLAN_HDD_P2P_CLIENT:
-       case WLAN_HDD_P2P_GO:
-       case WLAN_HDD_SOFTAP:
+       case VOS_STA_MODE:
+       case VOS_P2P_CLIENT_MODE:
+       case VOS_P2P_GO_MODE:
+       case VOS_STA_SAP_MODE:
     pHddCtx->no_of_sessions[mode]--;
     if (!(pHddCtx->no_of_sessions[mode]))
             pHddCtx->concurrency_mode &= (~(1 << mode));
