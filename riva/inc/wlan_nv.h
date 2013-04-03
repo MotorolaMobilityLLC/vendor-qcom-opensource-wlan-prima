@@ -98,6 +98,15 @@ typedef enum
 #define WLAN_NV_VERSION     NV_VERSION_11N_11AC_FW_CONFIG
 #endif //WCN_PRONTO
 
+typedef PACKED_PRE struct PACKED_POST
+{
+    uint8   macAddr1[NV_FIELD_MAC_ADDR_SIZE];
+    uint8   macAddr2[NV_FIELD_MAC_ADDR_SIZE];
+    uint8   macAddr3[NV_FIELD_MAC_ADDR_SIZE];
+    uint8   macAddr4[NV_FIELD_MAC_ADDR_SIZE];
+}sMacAddr;
+
+
 typedef PACKED_PRE union PACKED_POST
 {
     //common NV fields
@@ -106,10 +115,7 @@ typedef PACKED_PRE union PACKED_POST
     uint8   wlanNvRevId;
     uint8   numOfTxChains;
     uint8   numOfRxChains;
-    uint8   macAddr[NV_FIELD_MAC_ADDR_SIZE];   /* Default, not change name for compatibility */
-    uint8   macAddr2[NV_FIELD_MAC_ADDR_SIZE];
-    uint8   macAddr3[NV_FIELD_MAC_ADDR_SIZE];
-    uint8   macAddr4[NV_FIELD_MAC_ADDR_SIZE];
+    sMacAddr macAddr;
     uint8   mfgSN[NV_FIELD_MFG_SN_SIZE];
     uint8   couplerType;
     uint8   nvVersion;

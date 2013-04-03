@@ -2085,7 +2085,24 @@ int wlan_hdd_ftm_set_nv_field
 
       case NV_COMMON_MAC_ADDR:
          /* IKLOCSEN-715 START Support WLAN Multi MAC Programming */
-         for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
+        /* IKJB42MAIN-7853 START, gvx468 */
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                        "MAC = %02x:%02x:%02x:%02x:%02x:%02x, MAC2 = %02x:%02x:%02x:%02x:%02x:%02x, MAC3 =                                               %02x:%02x:%02x:%02x:%02x:%02x, MAC4 = %02x:%02x:%02x:%02x:%02x:%02x",
+                        nvField->fieldData.macAddr.macAddr1[0], nvField->fieldData.macAddr.macAddr1[1],
+                        nvField->fieldData.macAddr.macAddr1[2], nvField->fieldData.macAddr.macAddr1[3],
+                        nvField->fieldData.macAddr.macAddr1[4], nvField->fieldData.macAddr.macAddr1[5],
+                        nvField->fieldData.macAddr.macAddr2[0], nvField->fieldData.macAddr.macAddr2[1],
+                        nvField->fieldData.macAddr.macAddr2[2], nvField->fieldData.macAddr.macAddr2[3],
+                        nvField->fieldData.macAddr.macAddr2[4], nvField->fieldData.macAddr.macAddr2[5],
+                        nvField->fieldData.macAddr.macAddr3[0], nvField->fieldData.macAddr.macAddr3[1],
+                        nvField->fieldData.macAddr.macAddr3[2], nvField->fieldData.macAddr.macAddr3[3],
+                        nvField->fieldData.macAddr.macAddr3[4], nvField->fieldData.macAddr.macAddr3[5],
+                        nvField->fieldData.macAddr.macAddr4[0], nvField->fieldData.macAddr.macAddr4[1],
+                        nvField->fieldData.macAddr.macAddr4[2], nvField->fieldData.macAddr.macAddr4[3],
+                        nvField->fieldData.macAddr.macAddr4[4], nvField->fieldData.macAddr.macAddr4[5]);
+         /* IKJB42MAIN-7853 STOP, gvx468 */
+
+	 for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
          {
             v_U8_t *pNVMac =
                 macLoop == 0 ? (v_U8_t *)nvContents->fields.macAddr  :
@@ -2093,10 +2110,10 @@ int wlan_hdd_ftm_set_nv_field
                 macLoop == 2 ? (v_U8_t *)nvContents->fields.macAddr3 :
                                (v_U8_t *)nvContents->fields.macAddr4;
             v_U8_t *macPtr =
-                macLoop == 0 ? (v_U8_t *)nvField->fieldData.macAddr  :
-                macLoop == 1 ? (v_U8_t *)nvField->fieldData.macAddr2 :
-                macLoop == 2 ? (v_U8_t *)nvField->fieldData.macAddr3 :
-                               (v_U8_t *)nvField->fieldData.macAddr4;
+                macLoop == 0 ? (v_U8_t *)nvField->fieldData.macAddr.macAddr1 :
+                macLoop == 1 ? (v_U8_t *)nvField->fieldData.macAddr.macAddr2 :
+                macLoop == 2 ? (v_U8_t *)nvField->fieldData.macAddr.macAddr3 :
+                               (v_U8_t *)nvField->fieldData.macAddr.macAddr4;
             isBlankMac = VOS_TRUE;
             for(macOctet = 0; macOctet < VOS_MAC_ADDRESS_LEN ; macOctet++) {
                 if(macPtr[macOctet] !=0){
@@ -2106,10 +2123,11 @@ int wlan_hdd_ftm_set_nv_field
             }
             if(isBlankMac == VOS_FALSE) {
                 // MAC to be programmed!
-                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
                         "Writing MAC #%x, MAC = %02x:%02x:%02x:%02x:%02x:%02x",
                         macLoop, macPtr[0], macPtr[1], macPtr[2], macPtr[3], macPtr[4], macPtr[5]);
                 vos_mem_copy(pNVMac, macPtr, NV_FIELD_MAC_ADDR_SIZE);
+
             }
          }
          /* IKLOCSEN-715 STOP Support WLAN Multi MAC Programming */
@@ -3761,7 +3779,7 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
               macLoop,\
               MAC_ADDR_ARRAY(&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA]));
 
-       pMacAddress = &pMsgBody->SetNvField.fieldData.macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA];
+       pMacAddress = &pMsgBody->SetNvField.fieldData.macAddr.macAddr1[macLoop * VOS_MAX_CONCURRENCY_PERSONA];
 
        for(ii = 0; ii < VOS_MAC_ADDRESS_LEN; ii++) {
           pMacAddress[macLoop * VOS_MAX_CONCURRENCY_PERSONA + ii] =\
