@@ -2761,7 +2761,7 @@ static int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
 
     ENTER();
 
-    if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini)
+    if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini || NULL == StaParams)
     {
         VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                 "Invalid arguments");
@@ -2841,7 +2841,7 @@ static int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
     if (0 == update)
         wlan_hdd_tdls_set_link_status(pAdapter, mac, eTDLS_LINK_CONNECTING);
 
-    if (NULL != StaParams)
+    /* debug code */
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
                   "%s: TDLS Peer Parameters.", __func__);
@@ -2865,7 +2865,7 @@ static int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
                VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
                           "[%d]: %x ", i, StaParams->supported_rates[i]);
         }
-    }
+    }  /* end debug code */
 
     INIT_COMPLETION(pAdapter->tdls_add_station_comp);
 
