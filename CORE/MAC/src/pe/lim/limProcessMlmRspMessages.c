@@ -2702,8 +2702,6 @@ void limSetLinkStateForPostAssocCallback(tpAniSirGlobal pMac, void *msgParam )
     if((psessionEntry = peFindSessionBySessionId(pMac,pAddBssParams->sessionId))== NULL)
     {
         limLog( pMac, LOGE, FL( "Session Does not exist for given sessionId\n" ));
-            if( NULL != pAddBssParams )
-                palFreeMemory( pMac->hHdd, (void *) pAddBssParams );
         goto end;
     }
 
@@ -2772,8 +2770,8 @@ void limSetLinkStateForPostAssocCallback(tpAniSirGlobal pMac, void *msgParam )
     if( eHAL_STATUS_SUCCESS !=
         palAllocateMemory( pMac->hHdd, (void **) &pAddStaParams, sizeof( tAddStaParams )))
     {
-        limLog( pMac, LOGP, FL( "Unable to PAL allocate memory during ADD_STA\n" ));
-        return;
+        limLog( pMac, LOGP, FL( "Unable to PAL allocate memory during ADD_STA" ));
+        goto end;
     }
     palZeroMemory( pMac->hHdd, (tANI_U8 *) pAddStaParams, sizeof(tAddStaParams));
 
@@ -2875,7 +2873,10 @@ end:
     mlmReassocCnf.resultCode = eSIR_SME_FT_REASSOC_FAILURE;
     mlmReassocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
     /* Update PE sessio Id*/
-    mlmReassocCnf.sessionId = psessionEntry->peSessionId;
+    if (psessionEntry != NULL)
+        mlmReassocCnf.sessionId = psessionEntry->peSessionId;
+    else
+        mlmReassocCnf.sessionId = 0;
 
     limPostSmeMessage(pMac, LIM_MLM_REASSOC_CNF, (tANI_U32 *) &mlmReassocCnf);
 }
