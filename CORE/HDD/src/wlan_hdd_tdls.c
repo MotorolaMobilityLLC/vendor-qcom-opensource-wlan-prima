@@ -45,6 +45,7 @@ static struct mutex tdls_lock;
 static tANI_S32 wlan_hdd_get_tdls_discovery_peer_cnt(tdlsCtx_t *pHddTdlsCtx);
 static tANI_S32 wlan_hdd_tdls_peer_reset_discovery_processed(tdlsCtx_t *pHddTdlsCtx);
 static void wlan_hdd_tdls_timers_destroy(tdlsCtx_t *pHddTdlsCtx);
+
 #ifdef CONFIG_TDLS_IMPLICIT
 static void wlan_hdd_tdls_pre_setup(struct work_struct *work);
 #endif
