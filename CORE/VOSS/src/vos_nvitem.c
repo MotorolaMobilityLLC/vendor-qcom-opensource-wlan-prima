@@ -386,6 +386,14 @@ static v_SIZE_t nvReadEncodeBufSize;
 static v_SIZE_t nDictionarySize;
 static v_U32_t magicNumber;
 
+#ifdef WLAN_NV_OTA_UPGRADE
+typedef struct nvEFSTable_factory_s
+{
+   sNvFields fields;
+} nvEFSTable_factory_t;
+nvEFSTable_factory_t *gnvFactoryTable=NULL;
+#endif /* WLAN_NV_OTA_UPGRADE */
+
 const tRfChannelProps rfChannels[NUM_RF_CHANNELS] =
 {
     //RF_SUBBAND_2_4_GHZ
@@ -554,6 +562,9 @@ fail:
 VOS_STATUS vos_nv_open(void)
 {
     VOS_STATUS status = VOS_STATUS_SUCCESS;
+#ifdef WLAN_NV_OTA_UPGRADE
+    v_SIZE_t factoryNV_bufSize;
+#endif
     v_CONTEXT_t pVosContext= NULL;
     v_SIZE_t bufSize;
     v_SIZE_t nvReadBufSize;
@@ -659,9 +670,25 @@ VOS_STATUS vos_nv_open(void)
        vos_mem_free(pnvData);
     }
 
-    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+#ifdef WLAN_NV_OTA_UPGRADE
+    status = hdd_request_firmware(WLAN_FACTORY_NV_FILE,
+                                ((VosContextType*)(pVosContext))->pHDDContext,
+                                (v_VOID_t**)&gnvFactoryTable, &factoryNV_bufSize);
+    if ( (!VOS_IS_STATUS_SUCCESS( status )) || !gnvFactoryTable)
+    {
+         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                   "%s: unable to download NV file %s",
+                   __func__, WLAN_FACTORY_NV_FILE);
+         return VOS_STATUS_E_RESOURCES;
+    }
+     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+           "INFO: NV binary file version=%d Driver default NV version=%d, continue...\n",
+           gnvFactoryTable->fields.nvVersion, WLAN_NV_VERSION);
+#else /* WLAN_NV_OTA_UPGRADE */
+     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
            "INFO: NV binary file version=%d Driver default NV version=%d, continue...\n",
            gnvEFSTable->halnv.fields.nvVersion, WLAN_NV_VERSION);
+#endif /* WLAN_NV_OTA_UPGRADE */
 
      /* Copying the read nv data to the globa NV EFS table */
     {
@@ -678,7 +705,11 @@ VOS_STATUS vos_nv_open(void)
         vos_mem_copy(&(pnvEFSTable->halnv), &nvDefaults, sizeof(sHalNv));
 
         /* Size mismatch */
+#ifdef WLAN_NV_OTA_UPGRADE
+        if ( nvReadBufSize != bufSize || factoryNV_bufSize != sizeof(nvEFSTable_factory_t))
+#else
         if ( nvReadBufSize != bufSize)
+#endif
         {
             pnvEFSTable->nvValidityBitmap = DEFAULT_NV_VALIDITY_BITMAP;
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
@@ -713,7 +744,14 @@ VOS_STATUS vos_nv_open(void)
            VOS_STATUS_SUCCESS)
         {
             if (itemIsValid == VOS_TRUE) {
-
+#ifdef WLAN_NV_OTA_UPGRADE
+                memcpy((v_VOID_t *)&gnvEFSTable->halnv.fields,
+                   (v_VOID_t *)&gnvFactoryTable->fields, sizeof(sNvFields));
+                memcpy((v_VOID_t *)&pnvEFSTable->halnv.fields,
+                   (v_VOID_t *)&gnvFactoryTable->fields, sizeof(sNvFields));
+            }
+            else {
+#endif /* WLAN_NV_OTA_UPGRADE */
                 if(vos_nv_read( VNV_FIELD_IMAGE, (v_VOID_t *)&pnvEFSTable->halnv.fields,
                    NULL, sizeof(sNvFields) ) != VOS_STATUS_SUCCESS)
                    goto error;
@@ -898,6 +936,17 @@ VOS_STATUS vos_nv_close(void)
     vos_mem_free(pDictFile);
 
     gnvEFSTable=NULL;
+
+#ifdef WLAN_NV_OTA_UPGRADE
+    status = hdd_release_firmware(WLAN_FACTORY_NV_FILE, ((VosContextType*)(pVosContext))->pHDDContext);
+    if ( !VOS_IS_STATUS_SUCCESS( status ))
+    {
+        VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                         "%s : vos_open %s failed\n",__func__, WLAN_FACTORY_NV_FILE);
+        return VOS_STATUS_E_FAILURE;
+    }
+    gnvFactoryTable=NULL;
+#endif /* WLAN_NV_OTA_UPGRADE */
     return VOS_STATUS_SUCCESS;
 }
 /**------------------------------------------------------------------------
@@ -1549,6 +1598,18 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
     switch(type)
     {
         case VNV_FIELD_IMAGE:
+#ifdef WLAN_NV_OTA_UPGRADE
+            itemSize = sizeof(gnvFactoryTable->fields);
+            if(bufferSize != itemSize) {
+                VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                 ("type = %d buffer size=%d is less than data size=%d\r\n"),type, bufferSize,
+                  itemSize);
+                status = VOS_STATUS_E_INVAL;
+            }
+            else {
+                memcpy(&gnvFactoryTable->fields,inputVoidBuffer,bufferSize);
+            }
+#else /* WLAN_NV_OTA_UPGRADE */
             itemSize = sizeof(gnvEFSTable->halnv.fields);
             if(bufferSize != itemSize) {
                 VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -1559,6 +1620,7 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
             else {
                 memcpy(&gnvEFSTable->halnv.fields,inputVoidBuffer,bufferSize);
             }
+#endif /* WLAN_NV_OTA_UPGRADE */
             break;
         case VNV_RATE_TO_POWER_TABLE:
             itemSize = sizeof(gnvEFSTable->halnv.tables.pwrOptimum);
@@ -1747,8 +1809,20 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
       if (! VOS_IS_STATUS_SUCCESS(status)) {
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs failed!!!\r\n"));
           status = VOS_STATUS_E_FAULT;
+          goto exit;
       }
+
+#ifdef WLAN_NV_OTA_UPGRADE
+      status = wlan_write_to_efs((v_U8_t*)gnvFactoryTable,sizeof(nvEFSTable_factory_t));
+      if (! VOS_IS_STATUS_SUCCESS(status))
+      {
+          VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs factory nv failed!!!\r\n"));
+          status = VOS_STATUS_E_FAULT;
+      }
+#endif
    }
+
+exit:
    return status;
 }
 
