@@ -198,6 +198,9 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_WLAN_DBG      1
 #define WE_SET_WDI_DBG       2
 #define WE_SET_SAP_CHANNELS  3
+//Begin Motorola dcw476 4/17/13 IKJBXLINE-5577:changing wlan driver log level dynamically
+#define WE_SET_WLAN_DBG_TILL_LEVEL 4
+//END IKJBXLINE-5577
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_GET_CHAR_SET_NONE   (SIOCIWFIRSTPRIV + 5)
@@ -4154,6 +4157,7 @@ int iw_set_three_ints_getnone(struct net_device *dev, struct iw_request_info *in
     {
         case WE_SET_WLAN_DBG:
         {
+
             vos_trace_setValue( value[1], value[2], value[3]);
             break;
         }
@@ -4167,6 +4171,13 @@ int iw_set_three_ints_getnone(struct net_device *dev, struct iw_request_info *in
             ret = iw_softap_set_channel_range( dev, value[1], value[2], value[3]);
             break;
         }
+        //Begin Motorola dcw476 4/17/13 IKJBXLINE-5577:changing wlan driver log level dynamically
+        case WE_SET_WLAN_DBG_TILL_LEVEL:
+        {
+            vos_trace_setValue_till_level(value[1], value[2], value[3]);
+        }
+        break;
+        //END IKJBXLINE-5577
 
         default:
         {
@@ -7285,6 +7296,13 @@ static const struct iw_priv_args we_private_args[] = {
         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
         0,
         "setsapchannels" },
+
+   //Begin Motorola dcw476 4/17/13 IKJBXLINE-5577:changing wlan driver log level dynamically
+   {    WE_SET_WLAN_DBG_TILL_LEVEL,
+         IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
+         0,
+         "setwlanloglevel" },
+   //END IKJBXLINE-5577
 
     /* handlers for main ioctl */
     {   WLAN_PRIV_GET_CHAR_SET_NONE,
