@@ -2700,16 +2700,6 @@ void dxeRXEventHandler
    regValue &= WLANDXE_RX_INTERRUPT_PRO_UNMASK;
    wpalWriteRegister(WLANDXE_INT_MASK_REG_ADDRESS, regValue);
 
-   /* Enable system level ISR */
-   /* Enable RX ready Interrupt at here */
-   status = wpalEnableInterrupt(DXE_INTERRUPT_RX_READY);
-   if(eWLAN_PAL_STATUS_SUCCESS != status)
-   {
-      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
-               "dxeRXEventHandler Enable RX Ready interrupt fail");
-      return;
-   }
-
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Exit", __func__);
    return;
