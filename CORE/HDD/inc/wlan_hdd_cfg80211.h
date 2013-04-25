@@ -123,7 +123,13 @@ int wlan_hdd_cfg80211_pmksa_candidate_notify(
                     hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo,
                     int index, bool preauth );
 #endif
-
+//Begin fjdw67 Motorola, IKJB42MAIN-6385 - LFR roaming instrumentation
+#ifdef FEATURE_WLAN_LFR_METRICS
+    eHalStatus wlan_hdd_cfg80211_roam_metrics_preauth(hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo);
+    eHalStatus wlan_hdd_cfg80211_roam_metrics_preauth_status(hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo,bool preauth_status);
+    eHalStatus wlan_hdd_cfg80211_roam_metrics_handover(hdd_adapter_t *pAdapter, tCsrRoamInfo *pRoamInfo);
+#endif
+//End fjdw67 Motorola, IKJB42MAIN-6385
 #ifdef FEATURE_WLAN_WAPI
 void wlan_hdd_cfg80211_set_key_wapi(hdd_adapter_t* pAdapter,
               u8 key_index, const u8 *mac_addr, u8 *key , int key_Len);
