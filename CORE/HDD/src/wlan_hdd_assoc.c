@@ -2369,7 +2369,26 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
            }
            break;
 #endif
-
+//Begin fjdw67 Motorola, IKJB42MAIN-6385 - LFR roaming instrumentation
+#ifdef FEATURE_WLAN_LFR_METRICS
+          case eCSR_ROAM_PREAUTH_INIT_NOTIFY:
+             /* This event is to notify pre-auth initiation */
+             halStatus = wlan_hdd_cfg80211_roam_metrics_preauth(pAdapter, pRoamInfo);
+             break;
+          case eCSR_ROAM_PREAUTH_STATUS_SUCCESS:
+             /* This event will notify pre-auth completion in case of success */
+             halStatus = wlan_hdd_cfg80211_roam_metrics_preauth_status(pAdapter, pRoamInfo, 1);
+             break;
+          case eCSR_ROAM_PREAUTH_STATUS_FAILURE:
+             /* This event will notify pre-auth completion in case of failure. */
+             halStatus = wlan_hdd_cfg80211_roam_metrics_preauth_status(pAdapter,pRoamInfo, 0);
+             break;
+          case eCSR_ROAM_HANDOVER_SUCCESS:
+             /* This event is to notify handover success. It will be only invoked on success */
+             halStatus = wlan_hdd_cfg80211_roam_metrics_handover(pAdapter, pRoamInfo);
+             break;
+#endif
+//End fjdw67 Motorola, IKJB42MAIN-6385
         case eCSR_ROAM_INDICATE_MGMT_FRAME:
             hdd_indicateMgmtFrame( pAdapter,
                                   pRoamInfo->nFrameLength,
