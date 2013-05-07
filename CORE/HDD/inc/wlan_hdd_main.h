@@ -193,6 +193,9 @@
 #define HDD_MAC_ADDR_LEN    6
 typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
+#define HDD_MAC_ADDR_LEN    6
+typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
+
 typedef struct hdd_tx_rx_stats_s
 {
    // start_xmit stats
