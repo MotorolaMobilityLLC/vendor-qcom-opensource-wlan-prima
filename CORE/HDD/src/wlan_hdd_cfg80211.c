@@ -2846,19 +2846,25 @@ static int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
                   "%s: TDLS Peer Parameters.", __func__);
-        VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
-                  "ht_capa->cap_info: %0x", StaParams->HTCap.capInfo);
-        VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
-                  "ht_capa->extended_capabilities: %0x",
-                  StaParams->HTCap.extendedHtCapInfo);
+        if(StaParams->htcap_present)
+        {
+            VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
+                      "ht_capa->cap_info: %0x", StaParams->HTCap.capInfo);
+            VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
+                      "ht_capa->extended_capabilities: %0x",
+                      StaParams->HTCap.extendedHtCapInfo);
+        }
         VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
                   "params->capability: %0x",StaParams->capability);
         VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
                   "params->ext_capab_len: %0x",StaParams->extn_capability);
-        VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
-                  "rxMcsMap %x rxHighest %x txMcsMap %x txHighest %x",
-                  StaParams->VHTCap.suppMcs.rxMcsMap, StaParams->VHTCap.suppMcs.rxHighest,
-                  StaParams->VHTCap.suppMcs.txMcsMap, StaParams->VHTCap.suppMcs.txHighest);
+        if(StaParams->vhtcap_present)
+        {
+            VOS_TRACE(VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
+                      "rxMcsMap %x rxHighest %x txMcsMap %x txHighest %x",
+                      StaParams->VHTCap.suppMcs.rxMcsMap, StaParams->VHTCap.suppMcs.rxHighest,
+                      StaParams->VHTCap.suppMcs.txMcsMap, StaParams->VHTCap.suppMcs.txHighest);
+        }
         {
             int i = 0;
             VOS_TRACE( VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL, "Supported rates:");
@@ -2962,7 +2968,10 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
                              sizeof(StaParams.extn_capability));
 
             if (NULL != params->ht_capa)
+            {
+                StaParams.htcap_present = 1;
                 vos_mem_copy(&StaParams.HTCap, params->ht_capa, sizeof(tSirHTCap));
+            }
 
             StaParams.supported_rates_len = params->supported_rates_len;
 
@@ -2989,7 +2998,10 @@ static int wlan_hdd_change_station(struct wiphy *wiphy,
             }
 
             if (NULL != params->vht_capa)
+            {
+                StaParams.vhtcap_present = 1;
                 vos_mem_copy(&StaParams.VHTCap, params->vht_capa, sizeof(tSirVHTCap));
+            }
 
             if (0 != params->ext_capab_len ) {
                 /*Define A Macro : TODO Sunil*/
