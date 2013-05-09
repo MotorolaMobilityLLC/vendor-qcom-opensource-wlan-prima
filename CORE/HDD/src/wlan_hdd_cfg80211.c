@@ -6911,12 +6911,6 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
         return -ENOTSUPP;
     }
 
-    if ((SIR_MAC_TDLS_SETUP_RSP == action_code) ||
-        (SIR_MAC_TDLS_DIS_RSP == action_code))
-    {
-        wlan_hdd_tdls_set_cap (pAdapter, peer, eTDLS_CAP_SUPPORTED);
-    }
-
     /* other than teardown frame, other mgmt frames are not sent if disabled */
     if (SIR_MAC_TDLS_TEARDOWN != action_code)
     {
@@ -7017,6 +7011,18 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
        }
     }
 
+    if ((SIR_MAC_TDLS_SETUP_RSP == action_code) ||
+        (SIR_MAC_TDLS_DIS_RSP == action_code))
+    {
+        if (TRUE == sme_IsPmcBmps(WLAN_HDD_GET_HAL_CTX(pAdapter)))
+        {
+            VOS_TRACE( VOS_MODULE_ID_HDD, TDLS_LOG_LEVEL,
+                       "%s: Sending Disc/Setup Rsp Frame.Disable BMPS", __func__);
+            hdd_disable_bmps_imps(pHddCtx, WLAN_HDD_INFRA_STATION);
+        }
+        wlan_hdd_tdls_set_cap(pAdapter, peerMac, eTDLS_CAP_SUPPORTED);
+    }
+
     INIT_COMPLETION(pAdapter->tdls_mgmt_comp);
 
     status = sme_SendTdlsMgmtFrame(WLAN_HDD_GET_HAL_CTX(pAdapter), pAdapter->sessionId,
@@ -7026,7 +7032,8 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                 "%s: sme_SendTdlsMgmtFrame failed!", __func__);
-        return -EPERM;
+        wlan_hdd_tdls_check_bmps(pAdapter);
+        goto error;
     }
 
     /* not block discovery request, as it is called from timer callback */
@@ -7042,12 +7049,16 @@ static int wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device *d
             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                       "%s: Mgmt Tx Completion failed status %ld TxCompletion %lu",
                       __func__, rc, pAdapter->mgmtTxCompletionStatus);
+            wlan_hdd_tdls_check_bmps(pAdapter);
             goto error;
         }
     }
 
     if (max_sta_failed)
+    {
+      wlan_hdd_tdls_check_bmps(pAdapter);
       return max_sta_failed;
+    }
 
     if (SIR_MAC_TDLS_SETUP_RSP == action_code)
     {
@@ -7145,6 +7156,18 @@ static int wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device *d
                     status = hdd_roamRegisterTDLSSTA( pAdapter, peer, pTdlsPeer->staId, pTdlsPeer->signature);
                     if (VOS_STATUS_SUCCESS == status)
                     {
+                        if (pTdlsPeer->is_responder == 0)
+                        {
+                            v_U8_t staId = (v_U8_t)pTdlsPeer->staId;
+
+                            wlan_hdd_tdls_timer_restart(pAdapter,
+                                                        &pTdlsPeer->initiatorWaitTimeoutTimer,
+                                                       WAIT_TIME_TDLS_INITIATOR);
+                            /* suspend initiator TX until it receives direct packet from the
+                            reponder or WAIT_TIME_TDLS_INITIATOR timer expires */
+                            WLANTL_SuspendDataTx( (WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
+                                                   &staId, NULL);
+                        }
                         wlan_hdd_tdls_increment_peer_count(pAdapter);
                     }
                     wlan_hdd_tdls_check_bmps(pAdapter);
