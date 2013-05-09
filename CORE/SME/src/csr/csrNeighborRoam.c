@@ -2366,11 +2366,18 @@ VOS_STATUS csrNeighborRoamMergeChannelLists(
     int numChannels = outputNumOfChannels;
 
     // Check for NULL pointer
-    if (!pInputChannelList) return eHAL_STATUS_E_NULL_VALUE;
+    if (!pInputChannelList) return VOS_STATUS_E_INVAL;
 
     // Check for NULL pointer
-    if (!pOutputChannelList) return eHAL_STATUS_E_NULL_VALUE;
+    if (!pOutputChannelList) return VOS_STATUS_E_INVAL;
 
+    if (inputNumOfChannels > WNI_CFG_VALID_CHANNEL_LIST_LEN)
+    {
+         VOS_TRACE (VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+             "%s: Wrong Number of Input Channels %d",
+             __func__, inputNumOfChannels);
+         return VOS_STATUS_E_INVAL;
+    }
     // Add the "new" channels in the input list to the end of the output list.
     for (i = 0; i < inputNumOfChannels; i++)
     {
@@ -2395,7 +2402,7 @@ VOS_STATUS csrNeighborRoamMergeChannelLists(
     // Return final number of channels
     *pMergedOutputNumOfChannels = numChannels; 
 
-    return eHAL_STATUS_SUCCESS;
+    return VOS_STATUS_SUCCESS;
 }
 
 /* ---------------------------------------------------------------------------
