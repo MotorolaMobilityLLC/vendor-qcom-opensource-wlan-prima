@@ -14993,6 +14993,13 @@ static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
          aborted = true;
     }
 
+    if (!aborted) {
+        //Begin Mot IKHSS7-28961 : Dont allow sleep so that supplicant
+        // can fetch scan results before kerenel ages it out if slept immediately
+        // and sleep duration is more than the ageout time.
+        hdd_prevent_suspend_after_scan(HZ/4);
+       //END IKHSS7-28961
+    }
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0))
     if (NET_DEV_IS_IFF_UP(pAdapter) &&
         wlan_hdd_cfg80211_validate_scan_req(req, pHddCtx))
@@ -20134,9 +20141,21 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
                 pnoRequest.us5GProbeTemplateLen);
     }
 
+#if 0
     hdd_config_sched_scan_plan(&pnoRequest, request, pHddCtx);
+#endif
 
     pnoRequest.modePNO = SIR_PNO_MODE_IMMEDIATE;
+
+    /* framework provides interval in ms */
+    //BEGIN MOT a19110 IKJBMR2-1528 set PNO intervals
+    pnoRequest.scanTimers.ucScanTimersCount = 2;
+    pnoRequest.scanTimers.aTimerValues[0].uTimerRepeat = 7;
+    pnoRequest.scanTimers.aTimerValues[0].uTimerValue = 45;
+    pnoRequest.scanTimers.aTimerValues[1].uTimerRepeat = 0;
+    pnoRequest.scanTimers.aTimerValues[1].uTimerValue = 480;
+    //END IKJBMR2-1528
+
 
     INIT_COMPLETION(pAdapter->pno_comp_var);
     pnoRequest.statusCallback = hdd_cfg80211_sched_scan_start_status_cb;

@@ -346,6 +346,7 @@ enum eWniMsgTypes
     //eWNI_SME_TDLS_DEL_STA_RSP = 175.
     //Should fix above issue to enable TDLS_INTERNAL
     eWNI_SME_SET_BCN_FILTER_REQ,
+    eWNI_SME_SET_V6_MC_FILTER, // IKJB42MAIN-1244, Motorola, a19091
     eWNI_SME_RESET_AP_CAPS_CHANGED,
 #ifdef WLAN_FEATURE_11W
     eWNI_SME_UNPROT_MGMT_FRM_IND,
