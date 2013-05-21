@@ -8945,7 +8945,8 @@ void csrRoamJoinedStateMsgProcessor( tpAniSirGlobal pMac, void *pMsgBuf )
             pRoamInfo = &roamInfo;
             pUpperLayerAssocCnf = (tSirSmeAssocIndToUpperLayerCnf *)pMsgBuf;
             status = csrRoamGetSessionIdFromBSSID( pMac, (tCsrBssid *)pUpperLayerAssocCnf->bssId, &sessionId );
-            pSession = CSR_GET_SESSION(pMac, sessionId);
+            if (HAL_STATUS_SUCCESS(status))
+                pSession = CSR_GET_SESSION(pMac, sessionId);
 
             if(!pSession)
             {
