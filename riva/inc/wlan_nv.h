@@ -120,6 +120,7 @@ typedef enum
 
 typedef PACKED_PRE struct PACKED_POST
 {
+
     uint8   macAddr1[NV_FIELD_MAC_ADDR_SIZE];   /* Default, not change name for compatibility */
     uint8   macAddr2[NV_FIELD_MAC_ADDR_SIZE];
     uint8   macAddr3[NV_FIELD_MAC_ADDR_SIZE];
