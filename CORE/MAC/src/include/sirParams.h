@@ -813,6 +813,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_QPOWER                     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 307)
 
 
+#define SIR_HAL_RECEIVE_FILTER_SET_FILTER_MC_REQ (SIR_HAL_ITC_MSG_TYPES_BEGIN + 305) // IKJB42MAIN-1244, Motorola, a19091
 #define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 // CFG message types
