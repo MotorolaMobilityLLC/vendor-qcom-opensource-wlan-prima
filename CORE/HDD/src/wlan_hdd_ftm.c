@@ -2005,7 +2005,7 @@ int wlan_hdd_ftm_get_nv_field
       case NV_COMMON_MAC_ADDR:
          memcpy((void *)&nvField->fieldData,
              &nvFieldDataBuffer.macAddr[0],
-             NV_FIELD_MAC_ADDR_SIZE);
+             NV_FIELD_MAC_ADDR_SIZE * VOS_MAX_CONCURRENCY_PERSONA); // Motorola, IKLOCSEN-984 Return all MACs
          break;
 
       case NV_COMMON_MFG_SERIAL_NUMBER:
@@ -2077,8 +2077,10 @@ int wlan_hdd_ftm_set_nv_field
    v_SIZE_t           nvSize;
    sHalNv            *nvContents = NULL;
    v_U8_t             macLoop;
-   v_U8_t            *pNVMac;
-   v_U8_t             lastByteMAC;
+   /* IKLOCSEN-715 START Support WLAN Multi MAC Programming */
+   v_U8_t             macOctet;
+   v_BOOL_t           isBlankMac = VOS_FALSE;
+   /* IKLOCSEN-715 STOP Support WLAN Multi MAC Programming */
 
 
    nvStatus = vos_nv_getNVBuffer((void **)&nvContents, &nvSize);
@@ -2116,27 +2118,54 @@ int wlan_hdd_ftm_set_nv_field
          break;
 
       case NV_COMMON_MAC_ADDR:
-         /* If Last byte is larger than 252 (0xFC), return Error,
-          * Since 3MACs should be derived from first MAC */
-         if(QWLAN_MAX_MAC_LAST_BYTE_VALUE <
-            nvField->fieldData.macAddr.macAddr1[VOS_MAC_ADDRESS_LEN - 1])
-         {
-            VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                       "Last Byte of the seed MAC is too large 0x%x",
-                        nvField->fieldData.macAddr.macAddr1[VOS_MAC_ADDRESS_LEN - 1]);
-            return -EILSEQ;
-         }
 
-         pNVMac = (v_U8_t *)nvContents->fields.macAddr;
-         lastByteMAC = nvField->fieldData.macAddr.macAddr1[VOS_MAC_ADDRESS_LEN - 1];
-         for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
+         /* IKLOCSEN-715 START Support WLAN Multi MAC Programming */
+        /* IKJB42MAIN-7853 START, gvx468 */
+        VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                        "MAC = %02x:%02x:%02x:%02x:%02x:%02x, MAC2 = %02x:%02x:%02x:%02x:%02x:%02x, MAC3 = %02x:%02x:%02x:%02x:%02x:%02x, MAC4 = %02x:%02x:%02x:%02x:%02x:%02x",
+                        nvField->fieldData.macAddr.macAddr1[0], nvField->fieldData.macAddr.macAddr1[1],
+                        nvField->fieldData.macAddr.macAddr1[2], nvField->fieldData.macAddr.macAddr1[3],
+                        nvField->fieldData.macAddr.macAddr1[4], nvField->fieldData.macAddr.macAddr1[5],
+                        nvField->fieldData.macAddr.macAddr2[0], nvField->fieldData.macAddr.macAddr2[1],
+                        nvField->fieldData.macAddr.macAddr2[2], nvField->fieldData.macAddr.macAddr2[3],
+                        nvField->fieldData.macAddr.macAddr2[4], nvField->fieldData.macAddr.macAddr2[5],
+                        nvField->fieldData.macAddr.macAddr3[0], nvField->fieldData.macAddr.macAddr3[1],
+                        nvField->fieldData.macAddr.macAddr3[2], nvField->fieldData.macAddr.macAddr3[3],
+                        nvField->fieldData.macAddr.macAddr3[4], nvField->fieldData.macAddr.macAddr3[5],
+                        nvField->fieldData.macAddr.macAddr4[0], nvField->fieldData.macAddr.macAddr4[1],
+                        nvField->fieldData.macAddr.macAddr4[2], nvField->fieldData.macAddr.macAddr4[3],
+                        nvField->fieldData.macAddr.macAddr4[4], nvField->fieldData.macAddr.macAddr4[5]);
+         /* IKJB42MAIN-7853 STOP, gvx468 */
+
+	 for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
          {
-            nvField->fieldData.macAddr.macAddr1[VOS_MAC_ADDRESS_LEN - 1] =
-                                               lastByteMAC + macLoop;
-            vos_mem_copy(pNVMac + (macLoop * NV_FIELD_MAC_ADDR_SIZE),
-                         &nvField->fieldData.macAddr.macAddr1[0],
-                         NV_FIELD_MAC_ADDR_SIZE);
-         }
+            v_U8_t *pNVMac =
+                macLoop == 0 ? (v_U8_t *)nvContents->fields.macAddr  :
+                macLoop == 1 ? (v_U8_t *)nvContents->fields.macAddr2 :
+                macLoop == 2 ? (v_U8_t *)nvContents->fields.macAddr3 :
+                               (v_U8_t *)nvContents->fields.macAddr4;
+            v_U8_t *macPtr =
+                macLoop == 0 ? (v_U8_t *)nvField->fieldData.macAddr.macAddr1 :
+                macLoop == 1 ? (v_U8_t *)nvField->fieldData.macAddr.macAddr2 :
+                macLoop == 2 ? (v_U8_t *)nvField->fieldData.macAddr.macAddr3 :
+                               (v_U8_t *)nvField->fieldData.macAddr.macAddr4;
+            isBlankMac = VOS_TRUE;
+            for(macOctet = 0; macOctet < VOS_MAC_ADDRESS_LEN ; macOctet++) {
+                if(macPtr[macOctet] !=0){
+                    isBlankMac = VOS_FALSE;
+                    break;
+                }
+            }
+            if(isBlankMac == VOS_FALSE) {
+                // MAC to be programmed!
+                VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                        "Writing MAC #%x, MAC = %02x:%02x:%02x:%02x:%02x:%02x",
+                        macLoop, macPtr[0], macPtr[1], macPtr[2], macPtr[3], macPtr[4], macPtr[5]);
+                vos_mem_copy(pNVMac, macPtr, NV_FIELD_MAC_ADDR_SIZE);
+
+            }
+       }
+         /* IKLOCSEN-715 STOP Support WLAN Multi MAC Programming */
          break;
 
       case NV_COMMON_MFG_SERIAL_NUMBER:
@@ -3909,7 +3938,12 @@ done:
 static VOS_STATUS wlan_ftm_priv_get_mac_address(hdd_adapter_t *pAdapter,char *buf)
 {
     v_BOOL_t itemIsValid = VOS_FALSE;
-    v_U8_t macAddr[VOS_MAC_ADDRESS_LEN] = {0, 0x0a, 0xf5, 4,5, 6};
+
+    /* Motorola, BEGIN IKLOCSEN-984 Return all MACs */
+    v_MACADDR_t macAddr[VOS_MAX_CONCURRENCY_PERSONA];
+    v_U8_t      macLoop;
+    /* Motorola, END IKLOCSEN-984 Return all MACs */
+
     int ret;
 
     hdd_context_t *pHddCtx = (hdd_context_t *)pAdapter->pHddCtx;
@@ -3924,28 +3958,37 @@ static VOS_STATUS wlan_ftm_priv_get_mac_address(hdd_adapter_t *pAdapter,char *bu
     {
        if (itemIsValid == VOS_TRUE)
        {
-            vos_nv_readMacAddress(macAddr);
+          /* Motorola, BEGIN IKLOCSEN-984 Return all MACs */
+          vos_nv_readMultiMacAddress((v_U8_t *)&macAddr[0].bytes[0], VOS_MAX_CONCURRENCY_PERSONA);
 
-         ret = snprintf(buf, WE_FTM_MAX_STR_LEN,
-                             "%02x:%02x:%02x:%02x:%02x:%02x",
-                        MAC_ADDR_ARRAY(macAddr));
-         if( ret < 0 || ret >= WE_FTM_MAX_STR_LEN )
+         for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
          {
-             return VOS_STATUS_E_FAILURE;
+             ret = snprintf(buf, WE_FTM_MAX_STR_LEN,
+                            "%02x:%02x:%02x:%02x:%02x:%02x",
+                            MAC_ADDR_ARRAY(&macAddr[macLoop].bytes[0]));
+
+             if( ret < 0 || ret >= WE_FTM_MAX_STR_LEN )
+             {
+                return VOS_STATUS_E_FAILURE;
+             }
          }
-       }
+      }
    }
    else
    {
-         /*Return Hard coded mac address*/
-      ret = snprintf(buf, WE_FTM_MAX_STR_LEN,
-                            "%02x:%02x:%02x:%02x:%02x:%02x",
-                     MAC_ADDR_ARRAY(macAddr));
-
-      if( ret < 0 || ret >= WE_FTM_MAX_STR_LEN )
+      /* Return Hard coded mac address */
+      for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++)
       {
-          return VOS_STATUS_E_FAILURE;
+          ret = snprintf(buf, WE_FTM_MAX_STR_LEN,
+                         "%02x:%02x:%02x:%02x:%02x:%02x",
+                         MAC_ADDR_ARRAY(&macAddr[macLoop].bytes[0]));
+
+          if( ret < 0 || ret >= WE_FTM_MAX_STR_LEN )
+          {
+              return VOS_STATUS_E_FAILURE;
+          }
       }
+      /* Motorola, END IKLOCSEN-984 Return all MACs */
    }
     return VOS_STATUS_SUCCESS;
 }
@@ -3970,9 +4013,11 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
     tPttMsgbuffer *pMsgBuf;
     uPttMsgs *pMsgBody;
     VOS_STATUS status;
-    int macAddr[VOS_MAC_ADDRESS_LEN];
+    int macAddr[VOS_MAC_ADDRESS_LEN * VOS_MAX_CONCURRENCY_PERSONA]; // Motorola, IKLOCSEN-984 Set all MACs
     v_U8_t *pMacAddress;
     v_U8_t  ii;
+    v_U8_t  macLoop; // Motorola, IKLOCSEN-984 Set all MACs
+
     hdd_context_t *pHddCtx = (hdd_context_t *)pAdapter->pHddCtx;
 
     if(pHddCtx->ftm.ftm_state != WLAN_FTM_STARTED)
@@ -3986,26 +4031,61 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, "%s:pMsgBuf is NULL",__func__);
         return VOS_STATUS_E_NOMEM;
     }
+#if 0 // Motorola, IKLOCSEN-984 Set all MACs
     init_completion(&pHddCtx->ftm.ftm_comp_var);
+#endif // Motorola, IKLOCSEN-984 Set all MACs
     pMsgBuf->msgId = PTT_MSG_SET_NV_FIELD;
     pMsgBuf->msgBodyLength = sizeof(tMsgPttSetNvField) + PTT_HEADER_LENGTH;
 
     pMsgBody = &pMsgBuf->msgBody;
     pMsgBody->SetNvField.nvField = NV_COMMON_MAC_ADDR;
 
-    /*We get the mac address in string format "XX:XX:XX:XX:XX:XX" convert to hex*/
-    sscanf(buf,"%02x:%02x:%02x:%02x:%02x:%02x",&macAddr[0],(int*)&macAddr[1],(int*)&macAddr[2],(int*)&macAddr[3],(int*)&macAddr[4],(int*)&macAddr[5]);
+    /* Motorola, BEGIN IKLOCSEN-984 Set all MACS */
+    for(macLoop = 0; macLoop < VOS_MAX_CONCURRENCY_PERSONA; macLoop++) {
+       /*We get the mac address in string format "XX:XX:XX:XX:XX:XX" convert to hex*/
+       sscanf(buf,"%02x:%02x:%02x:%02x:%02x:%02x",\
+              (int*)&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + 0],\
+              (int*)&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + 1],\
+              (int*)&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + 2],\
+              (int*)&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + 3],\
+              (int*)&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + 4],\
+              (int*)&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + 5]);
 
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "MacAddress = %02x:%02x:%02x:%02x:%02x:%02x",MAC_ADDR_ARRAY(macAddr));
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,\
+                 "MacAddress[%d] = %02x:%02x:%02x:%02x:%02x:%02x",\
+                 macLoop,\
+                 MAC_ADDR_ARRAY(&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA]));
+
+       printk(KERN_INFO "MacAddress[%d] = %02x:%02x:%02x:%02x:%02x:%02x\n",\
+              macLoop,\
+              MAC_ADDR_ARRAY(&macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA]));
+
+       pMacAddress = &pMsgBody->SetNvField.fieldData.macAddr.macAddr1[macLoop * VOS_MAX_CONCURRENCY_PERSONA];
+
+       for(ii = 0; ii < VOS_MAC_ADDRESS_LEN; ii++) {
+          pMacAddress[macLoop * VOS_MAX_CONCURRENCY_PERSONA + ii] =\
+          (v_U8_t)macAddr[macLoop * VOS_MAX_CONCURRENCY_PERSONA + ii];
+       }
 
 
-    pMacAddress = &pMsgBody->SetNvField.fieldData.macAddr.macAddr1[0];
+       VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,\
+                 "pMacAddress[%d] = %02x:%02x:%02x:%02x:%02x:%02x",\
+                 macLoop,\
 
-    for(ii = 0; ii < VOS_MAC_ADDRESS_LEN; ii++)
-       pMacAddress[ii] = (v_U8_t)macAddr[ii];
+       printk(KERN_INFO "pMacAddress[%d] = %02x:%02x:%02x:%02x:%02x:%02x\n",\
+              macLoop,\
+              MAC_ADDR_ARRAY(&pMacAddress[macLoop * VOS_MAX_CONCURRENCY_PERSONA]));
+    }
 
+    if (wlan_hdd_process_ftm_host_cmd(pHddCtx, pMsgBuf) < 0)
+    {
+        printk(KERN_INFO "wlan_hdd_process_ftm_host_cmd PTT_MSG_SET_NV_FIELD failed\n");
+        status = VOS_STATUS_E_FAILURE;
+        goto done;
+    }
+#if 0
+   /* Motorola, END IKLOCSEN-984 Set all MACS */
 
-    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "pMacAddress = %02x:%02x:%02x:%02x:%02x:%02x",MAC_ADDR_ARRAY(pMacAddress));
     status = wlan_ftm_postmsg((v_U8_t*)pMsgBuf,pMsgBuf->msgBodyLength);
 
     if(status != VOS_STATUS_SUCCESS)
@@ -4026,6 +4106,7 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "NV_COMMON_MAC_ADDR Success!!!\n");
 
     init_completion(&pHddCtx->ftm.ftm_comp_var);
+#endif // Motorola, IKLOCSEN-984 Set all MACs
     memset( pMsgBuf,0,sizeof(tPttMsgbuffer));
 
     pMsgBuf->msgId = PTT_MSG_STORE_NV_TABLE;
@@ -4034,6 +4115,17 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
     pMsgBody = &pMsgBuf->msgBody;
 
     pMsgBody->StoreNvTable.nvTable = NV_FIELDS_IMAGE;
+
+    /* Motorola, BEGIN IKLOCSEN-984 Set all MACs */
+    if (wlan_hdd_process_ftm_host_cmd(pHddCtx, pMsgBuf) < 0)
+    {
+        printk(KERN_INFO "wlan_hdd_process_ftm_host_cmd PTT_MSG_STORE_NV_TABLE failed\n");
+        status = VOS_STATUS_E_FAILURE;
+        goto done;
+    }
+
+#if 0
+    /* Motorola, END IKLOCSEN-984 Set all MACs */
 
     status = wlan_ftm_postmsg((v_U8_t*)pMsgBuf,pMsgBuf->msgBodyLength);
 
@@ -4045,6 +4137,7 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
     }
 
     wait_for_completion_interruptible_timeout(&pHddCtx->ftm.ftm_comp_var, msecs_to_jiffies(WLAN_FTM_COMMAND_TIME_OUT));
+#endif // Motorola, IKLOCSEN-984 Set all MACs
 done:
     vos_mem_free((v_VOID_t * )pMsgBuf);
 
@@ -4370,7 +4463,7 @@ static int iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_inf
     return 0;
 }
 
-VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len)
+VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len, v_U16_t table)
 {
 #if defined(MSM_PLATFORM)
     tAniHdr *wmsg = NULL;
