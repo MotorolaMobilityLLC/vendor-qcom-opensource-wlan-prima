@@ -139,6 +139,9 @@ int wlan_hdd_ftm_start(hdd_context_t *pAdapter);
 #define MEMORY_DEBUG_STR ""
 #endif
 #define MAX_WAIT_FOR_ROC_COMPLETION 3
+
+#define MAX_RESTART_DRIVER_EVENT_LENGTH 30
+
 /* the Android framework expects this param even though we don't use it */
 #define BUF_LEN 20
 static char fwpath_buffer[BUF_LEN];
@@ -198,6 +201,7 @@ static vos_wake_lock_t wlan_wake_lock;
 
 /* set when SSR is needed after unload */
 static e_hdd_ssr_required isSsrRequired = HDD_SSR_NOT_REQUIRED;
+static struct wake_lock wlan_wake_lock_scan; //Mot IKHSS7-28961: Incorrect empty scan results
 
 //internal function declaration
 static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx);
@@ -8226,6 +8230,7 @@ static void __hdd_set_multicast_list(struct net_device *dev)
       hddLog(VOS_TRACE_LEVEL_INFO,
             "%s: allow all multicast frames", __func__);
       pAdapter->mc_addr_list.mc_cnt = 0;
+      wlan_hdd_update_v6_filters(pAdapter, 1); // IKJB42MAIN-1244, Motorola, a19091
    }
    else
    {
@@ -8252,6 +8257,8 @@ static void __hdd_set_multicast_list(struct net_device *dev)
                MAC_ADDR_ARRAY(pAdapter->mc_addr_list.addr[i]));
          i++;
       }
+      wlan_hdd_update_v6_filters(pAdapter, 0); // IKJB42MAIN-1244, Motorola, a19091
+
    }
 
    if (pHddCtx->hdd_wlan_suspended)
@@ -9054,6 +9061,15 @@ void hdd_allow_suspend(uint32_t reason)
     vos_wake_lock_release(&wlan_wake_lock, reason);
 
 }
+
+//Begin Mot IKHSS7-28961 : Incorrect emtpty scan results because of againg out
+void hdd_prevent_suspend_after_scan(long hz)
+{
+  wake_lock_timeout(&wlan_wake_lock_scan, hz);
+}
+//END IKHSS7-28961
+
+
 
 void hdd_prevent_suspend_timeout(v_U32_t timeout, uint32_t reason)
 {
@@ -10524,7 +10540,10 @@ static int hdd_driver_init( void)
 
    ENTER();
 
+#ifdef WLAN_OPEN_SOURCE
    vos_wake_lock_init(&wlan_wake_lock, "wlan");
+   vos_wake_lock_init(&wlan_wake_lock_scan, "wlan_scan"); //Mot IKHSS7-28961: Incorrect empty scan
+#endif
 
    pr_info("%s: loading driver v%s\n", WLAN_MODULE_NAME,
            QWLAN_VERSIONSTR TIMER_MANAGER_STR MEMORY_DEBUG_STR);
@@ -10615,7 +10634,12 @@ static int hdd_driver_init( void)
 #ifdef MEMORY_DEBUG
       vos_mem_exit();
 #endif
+
+#ifdef WLAN_OPEN_SOURCE
       vos_wake_lock_destroy(&wlan_wake_lock);
+      vos_wake_lock_destroy(&wlan_wake_lock_scan); //Mot IKHSS7-28961: Incorrect empty scan results
+#endif
+
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
       wlan_logging_sock_deinit_svc();
 #endif
@@ -10775,7 +10799,10 @@ static void hdd_driver_exit(void)
 #endif
 
 done:
+#ifdef WLAN_OPEN_SOURCE
    vos_wake_lock_destroy(&wlan_wake_lock);
+   vos_wake_lock_destroy(&wlan_wake_lock_scan); //Mot IKHSS7-28961: Incorrect empty scan results
+#endif
 
    pr_info("%s: driver unloaded\n", WLAN_MODULE_NAME);
 }
@@ -11094,6 +11121,27 @@ wlan_hdd_is_GO_power_collapse_allowed (hdd_context_t* pHddCtx)
           return FALSE;
 
 }
+
+// BEGIN MOTOROLA IKJB42MAIN-274, dpn473, 01/02/2013, Add flag to disable/enable MCC mode
+v_U8_t hdd_get_mcc_mode( void )
+{
+    v_CONTEXT_t pVosContext = vos_get_global_context( VOS_MODULE_ID_HDD, NULL );
+    hdd_context_t *pHddCtx;
+
+    if (NULL != pVosContext)
+    {
+        pHddCtx = vos_get_context( VOS_MODULE_ID_HDD, pVosContext);
+        if (NULL != pHddCtx)
+        {
+            return (v_U8_t)pHddCtx->cfg_ini->enableMCC;
+        }
+    }
+    /* we are in an invalid state :( */
+    hddLog(LOGE, "%s: Invalid context", __func__);
+    return (v_U8_t)0;
+}
+// END IKJB42MAIN-274
+
 /* Decide whether to allow/not the apps power collapse. 
  * Allow apps power collapse if we are in connected state.
  * if not, allow only if we are in IMPS  */
@@ -11362,13 +11410,14 @@ static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx)
    VOS_STATUS status = VOS_STATUS_SUCCESS;
    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
    int len = (sizeof (struct ieee80211_mgmt));
-   struct ieee80211_mgmt *mgmt = NULL; 
-   
+   struct ieee80211_mgmt *mgmt = NULL;
+   unsigned char restart_notification[MAX_RESTART_DRIVER_EVENT_LENGTH + 1];
+   union iwreq_data wrqu;
    /* Prepare the DEAUTH managment frame with reason code */
    mgmt =  kzalloc(len, GFP_KERNEL);
-   if(mgmt == NULL) 
+   if(mgmt == NULL)
    {
-      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, 
+      VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
             "%s: memory allocation failed (%d bytes)", __func__, len);
       return VOS_STATUS_E_NOMEM;
    }
@@ -11393,19 +11442,17 @@ static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx)
                pAdapterNode->pAdapter->dev->name,
                pAdapterNode->pAdapter->device_mode,
                pHddCtx->hdd_restart_retries + 1);
-         /* 
-          * CFG80211 event to restart the driver
-          * 
-          * 'cfg80211_send_unprot_deauth' sends a 
-          * NL80211_CMD_UNPROT_DEAUTHENTICATE event to supplicant at any state 
-          * of SME(Linux Kernel) state machine.
-          *
-          * Reason code WLAN_REASON_DISASSOC_LOW_ACK is currently used to restart
-          * the driver.
-          *
-          */
-         
-         cfg80211_send_unprot_deauth(pAdapterNode->pAdapter->dev, (u_int8_t*)mgmt, len );  
+
+          /* Notify the wpa supplicant of wcnss restart by sending the custom event */
+          memset(&wrqu, 0 , sizeof(wrqu));
+          memset(restart_notification, 0, sizeof(restart_notification));
+
+          strlcpy(restart_notification, "QCOM: RESTART_DRIVER_DXE", sizeof(restart_notification));
+
+          wrqu.data.pointer = restart_notification;
+          wrqu.data.length = strlen(restart_notification);
+
+          wireless_send_event(pAdapterNode->pAdapter->dev, IWEVCUSTOM, &wrqu, restart_notification);
       }
       status = hdd_get_next_adapter ( pHddCtx, pAdapterNode, &pNext );
       pAdapterNode = pNext;
