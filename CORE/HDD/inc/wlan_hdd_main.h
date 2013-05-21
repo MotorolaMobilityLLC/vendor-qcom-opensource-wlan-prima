@@ -1069,6 +1069,7 @@ typedef struct
 /* Changing value from 10 to 240, as later is
    supported by wcnss */
 #define WLAN_HDD_MAX_MC_ADDR_LIST 240
+#define WLAN_HDD_MAX_FILTER_SLOTS 10
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 typedef struct multicast_addr_list
@@ -1076,6 +1077,7 @@ typedef struct multicast_addr_list
    v_U8_t isFilterApplied;
    v_U8_t mc_cnt;
    v_U8_t addr[WLAN_HDD_MAX_MC_ADDR_LIST][ETH_ALEN];
+   v_U8_t filter_index[WLAN_HDD_MAX_MC_ADDR_LIST]; // IKJB42MAIN-1244, Motorola, a19091
 } t_multicast_add_list;
 #endif
 
@@ -1314,6 +1316,13 @@ struct hdd_adapter_s
    hdd_cfg80211_state_t cfg80211State;
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
+   // IKJB42MAIN-1244, Motorola, a19091 - START
+   v_U32_t user_filter_config;
+   v_U32_t driver_filter_config;
+   v_U8_t ipv6_user_set_map : 4;
+   v_U8_t ipv6_code_set_map : 4;
+   v_SCHAR_t filter_v6_index;
+   // IKJB42MAIN-1244, Motorola, a19091 - END
    t_multicast_add_list mc_addr_list;
 #endif
 
@@ -2022,6 +2031,7 @@ void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter);
 void hdd_prevent_suspend(uint32_t reason);
 void hdd_allow_suspend(uint32_t reason);
 void hdd_prevent_suspend_timeout(v_U32_t timeout, uint32_t reason);
+void hdd_prevent_suspend_after_scan(long hz); //Mot IKHSS7-28961 :Empty scan results
 bool hdd_is_ssr_required(void);
 void hdd_set_ssr_required(e_hdd_ssr_required value);
 void hdd_set_pre_close(hdd_context_t *pHddCtx);
