@@ -150,6 +150,8 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 
 #define SPACE_ASCII_VALUE  32
 
+#define SPACE_ASCII_VALUE  32
+
 // -------------------------------------------------------------------
 // Change channel generic scheme
 typedef void (*CHANGE_CHANNEL_CALLBACK)(tpAniSirGlobal pMac, eHalStatus status, tANI_U32 *data,
