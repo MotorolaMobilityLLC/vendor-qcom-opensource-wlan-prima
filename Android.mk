@@ -62,12 +62,25 @@ LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_CAL_FILE_M)
 include $(BUILD_PREBUILT)
 endif
 
+include $(CLEAR_VARS)
+LOCAL_MODULE       := WCNSS_qcom_wlan_nv_calibration_persist.bin
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(PRODUCT_OUT)/persist
+ifdef WIFI_DRIVER_CAL_FILE
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_CAL_FILE)
+else
+LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+endif
+include $(BUILD_PREBUILT)
+
 # calibration data will need to be overlay'd per product
 include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv_calibration.bin
 LOCAL_MODULE_TAGS  := optional
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima/cal_files
+LOCAL_REQUIRED_MODULES := WCNSS_qcom_wlan_nv_calibration_persist.bin
 ifdef WIFI_DRIVER_CAL_FILE
 LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_CAL_FILE)
 else
@@ -87,10 +100,23 @@ include $(BUILD_PREBUILT)
 endif
 
 include $(CLEAR_VARS)
+LOCAL_MODULE       := WCNSS_qcom_wlan_nv_regulatory_persist.bin
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(PRODUCT_OUT)/persist
+ifdef WIFI_DRIVER_REG_FILE
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_REG_FILE)
+else
+LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+endif
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv_regulatory.bin
 LOCAL_MODULE_TAGS  := optional
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima/cal_files
+LOCAL_REQUIRED_MODULES := WCNSS_qcom_wlan_nv_regulatory_persist.bin
 ifdef WIFI_DRIVER_REG_FILE
 LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_REG_FILE)
 else
@@ -118,6 +144,36 @@ LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
 endif
 include $(BUILD_PREBUILT)
 
+ifdef WIFI_DRIVER_HW_RADIO_SPECIFIC_CAL
+_hw_radio_cal_models :=
+
+define find-subdir-subdir-l2-files
+$(filter-out $(patsubst %,$(1)/%,$(3)),$(patsubst ./%,%,$(shell cd \
+            $(LOCAL_PATH) ; find $(1) -maxdepth 2 -name $(2))))
+endef
+
+define _add-hw-radio-cal
+include $$(CLEAR_VARS)
+LOCAL_MODULE :=$(notdir $(1))
+_hw_radio_cal_models += $$(LOCAL_MODULE)
+LOCAL_SRC_FILES := $1
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $$(TARGET_OUT_ETC)/firmware/wlan/prima/cal_files
+include $$(BUILD_PREBUILT)
+endef
+
+wifi_hw_radio_cal_list :=
+$(foreach _hw_cal, $(call find-subdir-subdir-l2-files, ../../../../../$(WIFI_DRIVER_HW_RADIO_SPECIFIC_CAL), "*.bin"), \
+  $(eval $(call _add-hw-radio-cal,$(_hw_cal))))
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := wifi_hw_radio_specific_cal
+LOCAL_MODULE_TAGS := optional
+LOCAL_REQUIRED_MODULES := $(_hw_radio_cal_models)
+include $(BUILD_PHONY_PACKAGE)
+
+endif
 # Build wlan.ko as either prima_wlan.ko or pronto_wlan.ko
 ###########################################################
 
@@ -158,7 +214,12 @@ $(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
 else
 $(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
         ln -sf /persist/WCNSS_qcom_wlan_nv.bin \
-        $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin)
+        $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin; \
+        ln -sf /persist/WCNSS_qcom_wlan_nv_calibration_persist.bin \
+        $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv_calibration.bin; \
+        ln -sf /persist/WCNSS_qcom_wlan_nv_regulatory_persist.bin \
+        $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv_regulatory.bin)
+
 endif
 
 endif
