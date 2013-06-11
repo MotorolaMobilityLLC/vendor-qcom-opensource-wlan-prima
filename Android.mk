@@ -149,7 +149,25 @@ _hw_radio_cal_models :=
 
 define find-subdir-subdir-l2-files
 $(filter-out $(patsubst %,$(1)/%,$(3)),$(patsubst ./%,%,$(shell cd \
-            $(LOCAL_PATH) ; find $(1) -maxdepth 2 -name $(2))))
+            $(LOCAL_PATH) ; find $(1) -maxdepth 2 -type f -name $(2))))
+endef
+
+define find-subdir-subdir-l2-slinks
+$(filter-out $(patsubst %,$(1)/%,$(3)),$(patsubst ./%,%,$(shell cd \
+            $(LOCAL_PATH) ; find $(1) -maxdepth 2 -type l -name $(2))))
+endef
+
+define find-subdir-subdir-slink-target
+$(filter-out $(patsubst %,$(1)/%,$(3)),$(patsubst ./%,%,$(shell cd \
+            $(LOCAL_PATH) ; find $(1) -maxdepth 1 -type l -printf "%l")))
+endef
+
+
+define _add-hw-radio-cal-slink
+include $$(CLEAR_VARS)
+$(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima/cal_files; \
+        ln -sf $(notdir $(call find-subdir-subdir-slink-target, $(1))) \
+        $(TARGET_OUT_ETC)/firmware/wlan/prima/cal_files/$(notdir $(1)))
 endef
 
 define _add-hw-radio-cal
@@ -167,12 +185,16 @@ wifi_hw_radio_cal_list :=
 $(foreach _hw_cal, $(call find-subdir-subdir-l2-files, ../../../../../$(WIFI_DRIVER_HW_RADIO_SPECIFIC_CAL), "*.bin"), \
   $(eval $(call _add-hw-radio-cal,$(_hw_cal))))
 
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := wifi_hw_radio_specific_cal
 LOCAL_MODULE_TAGS := optional
 LOCAL_REQUIRED_MODULES := $(_hw_radio_cal_models)
 include $(BUILD_PHONY_PACKAGE)
 
+wifi_hw_radio_cal_symlink_list :=
+$(foreach _hw_cal_slink, $(call find-subdir-subdir-l2-slinks, ../../../../../$(WIFI_DRIVER_HW_RADIO_SPECIFIC_CAL), "*.bin"), \
+  $(eval $(call _add-hw-radio-cal-slink,$(_hw_cal_slink))))
 endif
 # Build wlan.ko as either prima_wlan.ko or pronto_wlan.ko
 ###########################################################
