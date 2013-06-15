@@ -1928,8 +1928,11 @@ eHalStatus csrGet5GChannels(tpAniSirGlobal pMac)
         {
             if(pMac->scan.defaultPowerTable[Index].chanId >= 36 && pMac->scan.defaultPowerTable[Index].chanId <= 165)
             {
-                pMac->scan.base20MHzChannels.channelList[ channelList ] = pMac->scan.defaultPowerTable[Index].chanId;
-                channelList++;
+                if(channelList < WNI_CFG_VALID_CHANNEL_LIST_LEN)
+                {
+                   pMac->scan.base20MHzChannels.channelList[ channelList ] = pMac->scan.defaultPowerTable[Index].chanId;
+                   channelList++;
+                }
             }
         }
 
@@ -1989,8 +1992,11 @@ eHalStatus csrGet24GChannels(tpAniSirGlobal pMac)
         // Restoring the Backed up 5 GHZ channels
         for(channelList = 0;channelList < nuum5GchannelListBackup; channelList++ )
         {
-            pMac->scan.base20MHzChannels.channelList[ Index ] = channelList5GBackup[channelList];
-            Index++;
+            if (Index < WNI_CFG_VALID_CHANNEL_LIST_LEN)
+            {
+                pMac->scan.base20MHzChannels.channelList[ Index ] = channelList5GBackup[channelList];
+                Index++;
+            }
         }
 
         pMac->scan.numChannelsDefault = (num20MHzChannelsFound > Index) ? num20MHzChannelsFound : Index;
@@ -2254,7 +2260,7 @@ eHalStatus csrRoamCallCallback(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoam
     WLAN_VOS_DIAG_EVENT_DEF(connectionStatus, vos_event_wlan_status_payload_type);
 #endif
     tCsrRoamSession *pSession;
-    if( CSR_IS_SESSION_VALID( pMac, sessionId) )
+    if( pMac->roam.roamSession && CSR_IS_SESSION_VALID( pMac, sessionId) )
     {
         pSession = CSR_GET_SESSION( pMac, sessionId );
     }
@@ -2268,7 +2274,7 @@ eHalStatus csrRoamCallCallback(tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoam
     {
         smsLog(pMac, LOGW, " Assoc complete result = %d statusCode = %d reasonCode = %d", u2, pRoamInfo->statusCode, pRoamInfo->reasonCode);
     }
-    if ((u1 == eCSR_ROAM_FT_REASSOC_FAILED) && (pSession->bRefAssocStartCnt)) {
+    if (pSession && (u1 == eCSR_ROAM_FT_REASSOC_FAILED) && (pSession->bRefAssocStartCnt)) {
         /*
          * Decrement bRefAssocStartCnt for FT reassoc failure.
          * Reason: For FT reassoc failures, we first call 
@@ -5614,7 +5620,7 @@ static tANI_BOOLEAN csrRoamProcessResults( tpAniSirGlobal pMac, tSmeCmd *pComman
                 case eCsrForcedDisassocSta:
                 case eCsrForcedDeauthSta:
                    csrRoamStateChange( pMac, eCSR_ROAMING_STATE_JOINED, sessionId);
-                   if( CSR_IS_SESSION_VALID(pMac, sessionId) )
+                   if( pMac->roam.roamSession && CSR_IS_SESSION_VALID(pMac, sessionId) )
                    {                    
                        pSession = CSR_GET_SESSION(pMac, sessionId);
                        if (!pSession)
@@ -8851,7 +8857,7 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
             {
                 tSirSmeDeauthRsp* pDeauthRsp = (tSirSmeDeauthRsp *)pSirMsg;
                 sessionId = pDeauthRsp->sessionId;
-                if( CSR_IS_SESSION_VALID(pMac, sessionId) )
+                if( pMac->roam.roamSession && CSR_IS_SESSION_VALID(pMac, sessionId) )
                 {                    
                     pSession = CSR_GET_SESSION(pMac, sessionId);
                     if(!pSession)
@@ -8878,7 +8884,7 @@ void csrRoamCheckForLinkStatusChange( tpAniSirGlobal pMac, tSirSmeRsp *pSirMsg )
             {
                 tSirSmeDisassocRsp *pDisassocRsp = (tSirSmeDisassocRsp *)pSirMsg;
                 sessionId = pDisassocRsp->sessionId;
-                if( CSR_IS_SESSION_VALID(pMac, sessionId) )
+                if( pMac->roam.roamSession && CSR_IS_SESSION_VALID(pMac, sessionId) )
                 {                    
                     pSession = CSR_GET_SESSION(pMac, sessionId);
                     if(!pSession)

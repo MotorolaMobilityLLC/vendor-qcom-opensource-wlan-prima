@@ -3211,13 +3211,16 @@ VOS_STATUS csrNeighborRoamTransitToCFGChanScan(tpAniSirGlobal pMac)
 
             currChannelListInfo->ChannelList =
                 vos_mem_malloc(numOfChannels*sizeof(tANI_U8));
-            if (NULL == currChannelListInfo->ChannelList)
-            {
-                smsLog(pMac, LOGE, FL("Memory allocation for Channel list failed"));
-                return VOS_STATUS_E_RESOURCES;
-            }
-
-            vos_mem_copy(currChannelListInfo->ChannelList,
+             if (NULL == currChannelListInfo->ChannelList)
+             {
+                 smsLog(pMac, LOGE, FL("Memory allocation for Channel list failed"));
+                 return VOS_STATUS_E_RESOURCES;
+             }
+             if (WNI_CFG_VALID_CHANNEL_LIST_LEN < numOfChannels)
+             {
+                 numOfChannels = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+             }
+             vos_mem_copy(currChannelListInfo->ChannelList,
                   channelList, numOfChannels * sizeof(tANI_U8));
         } 
 #ifdef FEATURE_WLAN_LFR
@@ -3298,6 +3301,10 @@ VOS_STATUS csrNeighborRoamTransitToCFGChanScan(tpAniSirGlobal pMac)
                     smsLog(pMac, LOGE, FL("Memory allocation for Channel list failed"));
                     return VOS_STATUS_E_RESOURCES;
                 }
+                if (WNI_CFG_VALID_CHANNEL_LIST_LEN < numOfChannels)
+                {
+                    numOfChannels = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+                }
                 vos_mem_copy(currChannelListInfo->ChannelList,
                         channelList,
                         numOfChannels * sizeof(tANI_U8));
@@ -3360,9 +3367,17 @@ VOS_STATUS csrNeighborRoamTransitToCFGChanScan(tpAniSirGlobal pMac)
                 return VOS_STATUS_E_RESOURCES;
             }
 #ifdef FEATURE_WLAN_LFR
+            if (WNI_CFG_VALID_CHANNEL_LIST_LEN < numOfChannels)
+            {
+                numOfChannels = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+            }
             vos_mem_copy(currChannelListInfo->ChannelList,
                     channelList, numOfChannels * sizeof(tANI_U8));
 #else
+            if (WNI_CFG_VALID_CHANNEL_LIST_LEN < numOfChannels)
+            {
+                numOfChannels = WNI_CFG_VALID_CHANNEL_LIST_LEN;
+            }
             vos_mem_copy(currChannelListInfo->ChannelList,
                     (tANI_U8 *)pMac->roam.validChannelList,
                     numOfChannels * sizeof(tANI_U8));

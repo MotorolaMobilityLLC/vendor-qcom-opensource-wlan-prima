@@ -2339,7 +2339,10 @@ dump_lim_mcc_policy_maker(tpAniSirGlobal pMac, tANI_U32 arg1,tANI_U32 arg2,tANI_
       v_VOID_t * pVosContext = vos_get_global_context(VOS_MODULE_ID_WDA, NULL);
       tWDA_CbContext *pWDA =  vos_get_context(VOS_MODULE_ID_WDA, pVosContext);
       ccmCfgSetInt(pMac, WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED, TRUE, NULL, eANI_BOOLEAN_FALSE);
-      WDA_TimerTrafficStatsInd(pWDA);
+      if(NULL != pWDA)
+      {
+         WDA_TimerTrafficStatsInd(pWDA);
+      }
       WDA_TrafficStatsTimerActivate(FALSE);
       ccmCfgSetInt(pMac, WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED, FALSE,NULL, eANI_BOOLEAN_FALSE);
    }
