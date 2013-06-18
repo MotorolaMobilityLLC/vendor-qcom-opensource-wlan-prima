@@ -448,6 +448,11 @@ eHalStatus csrTdlsProcessSendMgmt( tpAniSirGlobal pMac, tSmeCmd *cmd )
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, cmd->sessionId );
     eHalStatus status = eHAL_STATUS_FAILURE;
 
+    if (NULL == pSession)
+    {
+        return eHAL_STATUS_FAILURE;
+    }
+
     if (NULL == pSession->pConnectBssDesc)
     {
         smsLog( pMac, LOGE, FL("BSS Description is not present") );
@@ -507,6 +512,11 @@ eHalStatus csrTdlsProcessAddSta( tpAniSirGlobal pMac, tSmeCmd *cmd )
     tSirTdlsAddStaReq *tdlsAddStaReq = NULL ;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, cmd->sessionId );
     eHalStatus status = eHAL_STATUS_FAILURE;
+
+    if (NULL == pSession)
+    {
+        return eHAL_STATUS_FAILURE;
+    }
 
     if (NULL == pSession->pConnectBssDesc)
     {
@@ -568,6 +578,11 @@ eHalStatus csrTdlsProcessDelSta( tpAniSirGlobal pMac, tSmeCmd *cmd )
     tSirTdlsDelStaReq *tdlsDelStaReq = NULL ;
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, cmd->sessionId );
     eHalStatus status = eHAL_STATUS_FAILURE;
+
+    if (NULL == pSession)
+    {
+        return eHAL_STATUS_FAILURE;
+    }
 
     if (NULL == pSession->pConnectBssDesc)
     {

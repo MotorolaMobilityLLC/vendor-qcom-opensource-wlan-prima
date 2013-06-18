@@ -323,7 +323,7 @@ limCheckRxBasicRates(tpAniSirGlobal pMac, tSirMacRateSet rxRateSet,tpPESession p
     for (k = 0; k < j; k++)
     {
         match = 0;
-        for (i = 0; i < rxRateSet.numRates; i++)
+        for (i = 0; ((i < rxRateSet.numRates) && (i < SIR_MAC_RATESET_EID_MAX)); i++)
         {
             if ((rxRateSet.rate[i] | 0x80) ==    basicRate.rate[k])
                 match = 1;
@@ -1704,7 +1704,7 @@ limPopulateOwnRateSet(tpAniSirGlobal pMac,
             min = 0;
             val = 0xff;
             isArate = 0;
-            for(j = 0;j < tempRateSet.numRates; j++)
+            for(j = 0; (j < tempRateSet.numRates) && (j < SIR_MAC_RATESET_EID_MAX); j++)
             {
                 if ((tANI_U32) (tempRateSet.rate[j] & 0x7f) < val)
                 {
@@ -1927,7 +1927,7 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
      * Copy received rates in tempRateSet, the parser has ensured
      * unicity of the rates so there cannot be more than 12
      */
-    for(i = 0; i < pOperRateSet->numRates; i++)
+    for(i = 0; (i < pOperRateSet->numRates && i < SIR_MAC_RATESET_EID_MAX) ; i++)
     {
         tempRateSet.rate[i] = pOperRateSet->rate[i];
     }
@@ -1947,7 +1947,7 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
          int found = 0;
          int tail = tempRateSet.numRates;
 
-          for( i = 0; i < pExtRateSet->numRates; i++ )
+          for( i = 0; (i < pExtRateSet->numRates && i < SIR_MAC_RATESET_EID_MAX); i++ )
           {
             found = 0;
             for( j = 0; j < (tANI_U32) tail; j++ )
@@ -1976,8 +1976,11 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
       }
       else
       {
-        for(j = 0; j < pExtRateSet->numRates; j++)
+        for(j = 0; ((j < pExtRateSet->numRates) && (j < SIR_MAC_RATESET_EID_MAX)
+            && ((i+j) < SIR_MAC_RATESET_EID_MAX)); j++)
+        {
             tempRateSet.rate[i+j] = pExtRateSet->rate[j];
+        }
 
         tempRateSet.numRates += pExtRateSet->numRates;
       }
@@ -1988,9 +1991,9 @@ limPopulateMatchingRateSet(tpAniSirGlobal pMac,
         tANI_U8 aRateIndex = 0;
         tANI_U8 bRateIndex = 0;
         palZeroMemory( pMac->hHdd, (tANI_U8 *) rates, sizeof(tSirSupportedRates));
-        for(i = 0;i < tempRateSet2.numRates; i++)
+        for(i = 0; (i < tempRateSet2.numRates && i < SIR_MAC_RATESET_EID_MAX ); i++)
         {
-            for(j = 0;j < tempRateSet.numRates; j++)
+            for(j = 0; (j < tempRateSet.numRates && j < SIR_MAC_RATESET_EID_MAX); j++)
             {
                 if ((tempRateSet2.rate[i] & 0x7F) ==
                     (tempRateSet.rate[j] & 0x7F))

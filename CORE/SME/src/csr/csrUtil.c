@@ -4014,8 +4014,10 @@ tANI_U8 csrConstructWapiIe( tpAniSirGlobal pMac, tANI_U32 sessionId, tCsrRoamPro
 
         pWapi = (tANI_U8 *) (&pWapiIe->AuthOui[ 1 ]);
 
-        *pWapi = (tANI_U16)1; //cUnicastCyphers
-        pWapi+=2;
+        *pWapi = (tANI_U8)1; //cUnicastCyphers
+        pWapi+=1;
+        *pWapi = (tANI_U8)0; //cUnicastCyphers
+        pWapi+=1;
         palCopyMemory( pMac->hHdd, pWapi, UnicastCypher, sizeof( UnicastCypher ) );
         pWapi += sizeof( UnicastCypher );
 
