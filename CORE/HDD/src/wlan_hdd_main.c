@@ -10565,6 +10565,8 @@ static int hdd_driver_init( void)
    if (max_retries >= 5) {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: WCNSS driver not ready", __func__);
       vos_wake_lock_destroy(&wlan_wake_lock);
+      vos_wake_lock_destroy(&wlan_wake_lock_scan);
+
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
       wlan_logging_sock_deinit_svc();
 #endif
