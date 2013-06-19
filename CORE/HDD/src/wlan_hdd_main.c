@@ -6115,6 +6115,7 @@ static int hdd_driver_init( void)
           "exiting", __func__);
 #ifdef WLAN_OPEN_SOURCE
       wake_lock_destroy(&wlan_wake_lock);
+      wake_lock_destroy(&wlan_wake_lock_scan);
 #endif
       return -EIO;
    }
@@ -6136,9 +6137,10 @@ static int hdd_driver_init( void)
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: WCNSS driver not ready", __func__);
 #ifdef WLAN_OPEN_SOURCE
       wake_lock_destroy(&wlan_wake_lock);
+      wake_lock_destroy(&wlan_wake_lock_scan);
 #endif
-      return -ENODEV;
-   }
+     return -ENODEV;
+  }
 #endif
 
    dev = wcnss_wlan_get_device();
