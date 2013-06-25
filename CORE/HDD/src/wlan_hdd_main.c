@@ -3018,6 +3018,7 @@ void hdd_set_pwrparams(hdd_context_t *pHddCtx)
    tSirSetPowerParamsReq powerRequest = { 0 };
 
    powerRequest.uIgnoreDTIM = 1;
+   powerRequest.uMaxLIModulatedDTIM = pHddCtx->cfg_ini->fMaxLIModulatedDTIM;
 
    if (pHddCtx->cfg_ini->enableModulatedDTIM)
    {
@@ -3050,6 +3051,7 @@ void hdd_reset_pwrparams(hdd_context_t *pHddCtx)
 
    powerRequest.uIgnoreDTIM = pHddCtx->hdd_actual_ignore_DTIM_value;
    powerRequest.uListenInterval = pHddCtx->hdd_actual_LI_value;
+   powerRequest.uMaxLIModulatedDTIM = pHddCtx->cfg_ini->fMaxLIModulatedDTIM;
 
    /* Update ignoreDTIM and ListedInterval in CFG with default values */
    ccmCfgSetInt(pHddCtx->hHal, WNI_CFG_IGNORE_DTIM, powerRequest.uIgnoreDTIM,
