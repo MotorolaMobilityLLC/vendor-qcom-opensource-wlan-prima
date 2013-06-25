@@ -4610,6 +4610,7 @@ tAniEdType csrTranslateEncryptTypeToEdType( eCsrEncryptionType EncryptType )
 #ifdef FEATURE_WLAN_WAPI
         case eCSR_ENCRYPT_TYPE_WPI:
             edType = eSIR_ED_WPI;
+            break ;
 #endif
 #ifdef WLAN_FEATURE_11W
         //11w BIP
