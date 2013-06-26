@@ -181,6 +181,9 @@
 #define GTK_OFFLOAD_DISABLE 1
 #endif
 
+#define HDD_MAC_ADDR_LEN    6
+typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
+
 typedef struct hdd_tx_rx_stats_s
 {
    // start_xmit stats
@@ -261,6 +264,12 @@ typedef struct roaming_info_s
 {
    HDD_ROAM_STATE roamingState;
    vos_event_t roamingEvent;
+
+   tWlanHddMacAddr bssid;
+   tWlanHddMacAddr peerMac;
+   tANI_U32 roamId;
+   eRoamCmdStatus roamStatus;
+   v_BOOL_t deferKeyComplete;
    
 } roaming_info_t;
 
