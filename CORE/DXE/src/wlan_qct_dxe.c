@@ -49,7 +49,6 @@
    This file contains the external API exposed by the wlan data transfer abstraction layer module.
    Copyright (c) 2010-2011 Qualcomm Technologies, Inc.
    All Rights Reserved.
-   Qualcomm Technologies Confidential and Proprietary
 ========================================================================*/
 
 /*===========================================================================
@@ -2678,16 +2677,6 @@ void dxeRXEventHandler
       return;         
    }
 
-   /* Enable system level ISR */
-   /* Enable RX ready Interrupt at here */
-   status = wpalEnableInterrupt(DXE_INTERRUPT_RX_READY);
-   if(eWLAN_PAL_STATUS_SUCCESS != status)
-   {
-      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
-               "dxeRXEventHandler Enable RX Ready interrupt fail");
-      return;         
-   }
-
    /* Prepare Control Register EN Channel */
    if(!(dxeCtxt->dxeChannel[WDTS_CHANNEL_RX_HIGH_PRI].extraConfig.chan_mask & WLANDXE_CH_CTRL_EN_MASK))
    {
@@ -2710,6 +2699,16 @@ void dxeRXEventHandler
    wpalReadRegister(WLANDXE_INT_MASK_REG_ADDRESS, &regValue);
    regValue &= WLANDXE_RX_INTERRUPT_PRO_UNMASK;
    wpalWriteRegister(WLANDXE_INT_MASK_REG_ADDRESS, regValue);
+
+   /* Enable system level ISR */
+   /* Enable RX ready Interrupt at here */
+   status = wpalEnableInterrupt(DXE_INTERRUPT_RX_READY);
+   if(eWLAN_PAL_STATUS_SUCCESS != status)
+   {
+      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "dxeRXEventHandler Enable RX Ready interrupt fail");
+      return;
+   }
 
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Exit", __func__);
