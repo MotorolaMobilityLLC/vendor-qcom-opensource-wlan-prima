@@ -8088,16 +8088,6 @@ VOS_STATUS sme_DeleteTdlsPeerSta(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr
 
 }
 /* ---------------------------------------------------------------------------
-    \fn sme_IsPmcBmps
-    \API to Check if PMC state is BMPS.
-
-    \- return v_BOOL_t
-    -------------------------------------------------------------------------*/
-v_BOOL_t sme_IsPmcBmps(tHalHandle hHal)
-{
-    return (BMPS == pmcGetPmcState(hHal));
-}
-/* ---------------------------------------------------------------------------
     \fn sme_SetTdlsPowerSaveProhibited
     \API to set/reset the isTdlsPowerSaveProhibited.
 
@@ -8111,6 +8101,17 @@ void sme_SetTdlsPowerSaveProhibited(tHalHandle hHal, v_BOOL_t val)
     return;
 }
 #endif
+/* ---------------------------------------------------------------------------
+    \fn sme_IsPmcBmps
+    \API to Check if PMC state is BMPS.
+
+    \- return v_BOOL_t
+    -------------------------------------------------------------------------*/
+v_BOOL_t sme_IsPmcBmps(tHalHandle hHal)
+{
+    return (BMPS == pmcGetPmcState(hHal));
+}
+
 #ifdef FEATURE_WLAN_TDLS_INTERNAL
 /*
  * SME API to start TDLS discovery Procedure
