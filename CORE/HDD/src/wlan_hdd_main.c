@@ -899,6 +899,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
                goto exit;
            }
        }
+#ifdef FEATURE_WLAN_LFR
        /* SETROAMMODE */
        else if (strncmp(command, "SETROAMMODE", SIZE_OF_SETROAMMODE) == 0)
        {
@@ -948,8 +949,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	       roamMode = CFG_LFR_FEATURE_ENABLED_MIN;    /* Roam disable */
 
 	   pHddCtx->cfg_ini->isFastRoamIniFeatureEnabled = roamMode;
-	   sme_UpdateIsFastRoamIniFeatureEnabled((tHalHandle)(pHddCtx->hHal), roamMode);
-
+           sme_UpdateIsFastRoamIniFeatureEnabled((tHalHandle)(pHddCtx->hHal), roamMode);
        }
        /* GETROAMMODE */
        else if (strncmp(priv_data.buf, "GETROAMMODE", SIZE_OF_GETROAMMODE) == 0)
@@ -975,6 +975,7 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
                goto exit;
 	   }
        }
+#endif
 #endif
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
        else if (strncmp(command, "SETROAMDELTA", 12) == 0)
