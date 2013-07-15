@@ -51,17 +51,9 @@
 DESCRIPTION
   This file contains the external API exposed by the wlan transport layer
   module.
-<<<<<<< HEAD:CORE/TL/inc/wlan_qct_tl.h
-  
       
-  Copyright (c) 2008 QUALCOMM Incorporated. All Rights Reserved.
-  Qualcomm Confidential and Proprietary
-=======
-
-
   Copyright (c) 2008 Qualcomm Technologies, Inc. All Rights Reserved.
   Qualcomm Technologies Confidential and Proprietary
->>>>>>> 326d6cf... wlan: remove obsolete ANI_CHIPSET_VOLANS featurization:prima/CORE/TL/inc/wlan_qct_tl.h
 ===========================================================================*/
 
 
@@ -2625,4 +2617,74 @@ WLANTL_ClearTxXmitPending
   v_PVOID_t       pvosGCtx
 );
 
+/*===============================================================================
+  FUNCTION       WLANTL_UpdateLinkCapacity
+
+  DESCRIPTION    This function updates the STA's Link Capacity in TL
+
+  DEPENDENCIES   None
+
+  PARAMETERS
+
+    pvosGCtx         VOS context          VOS Global context
+    staId            Station ID           Station ID
+    linkCapacity     linkCapacity         Link Capacity
+
+  RETURN         None
+
+  SIDE EFFECTS   none
+ ===============================================================================*/
+
+void
+WLANTL_UpdateLinkCapacity
+(
+  v_PVOID_t pvosGCtx,
+  v_U8_t staId,
+  v_U32_t linkCapacity);
+
+/*===========================================================================
+
+  FUNCTION    WLANTL_GetSTALinkCapacity
+
+  DESCRIPTION
+
+    Returns Link Capacity of a particular STA.
+
+  DEPENDENCIES
+
+    A station must have been registered before its state can be retrieved.
+
+
+  PARAMETERS
+
+    IN
+    pvosGCtx:       pointer to the global vos context; a handle to TL's
+                    control block can be extracted from its context
+    ucSTAId:        identifier of the station
+
+    OUT
+    plinkCapacity:  the current link capacity the connection to
+                    the given station
+
+
+  RETURN VALUE
+
+    The result code associated with performing the operation
+
+    VOS_STATUS_E_INVAL:  Input parameters are invalid
+    VOS_STATUS_E_FAULT:  Station ID is outside array boundaries or pointer to
+                         TL cb is NULL ; access would cause a page fault
+    VOS_STATUS_E_EXISTS: Station was not registered
+    VOS_STATUS_SUCCESS:  Everything is good :)
+
+  SIDE EFFECTS
+
+============================================================================*/
+VOS_STATUS
+WLANTL_GetSTALinkCapacity
+(
+  v_PVOID_t             pvosGCtx,
+  v_U8_t                ucSTAId,
+  v_U32_t               *plinkCapacity
+);
 #endif /* #ifndef WLAN_QCT_WLANTL_H */
