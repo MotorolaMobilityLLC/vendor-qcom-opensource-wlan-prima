@@ -1579,6 +1579,7 @@ err_vosclose:
 err_re_init:
    /* Allow the phone to go to sleep */
    hdd_allow_suspend();
+   VOS_BUG(0);
    return -EPERM;
 
 success:
