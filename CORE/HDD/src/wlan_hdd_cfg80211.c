@@ -3811,6 +3811,8 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
     struct cfg80211_bss *bss_status = NULL;
     size_t frame_len = sizeof (struct ieee80211_mgmt) + ie_length;
     int rssi = 0;
+    hdd_context_t *pHddCtx;
+    int status;
 #ifdef WLAN_OPEN_SOURCE
     struct timespec ts;
 #endif
@@ -3819,6 +3821,16 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
 
     if (!mgmt)
         return NULL;
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    status = wlan_hdd_validate_context(pHddCtx);
+
+    if (0 != status)
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                   "%s: HDD context is not valid", __func__);
+        return NULL;
+    }
 
     memcpy(mgmt->bssid, bss_desc->bssId, ETH_ALEN);
 
@@ -3910,7 +3922,8 @@ wlan_hdd_cfg80211_inform_bss_frame( hdd_adapter_t *pAdapter,
              pAdapter->sessionCtx.station.conn_info.connState ) &&
              ( VOS_TRUE == vos_mem_compare(bss_desc->bssId,
                              pAdapter->sessionCtx.station.conn_info.bssId,
-                             WNI_CFG_BSSID_LEN)))
+                             WNI_CFG_BSSID_LEN)) &&
+                             (pHddCtx->hdd_wlan_suspended == FALSE))
     {
        /* supplicant takes the signal strength in terms of mBm(100*dBm) */
        rssi = (pAdapter->rssi * 100);
