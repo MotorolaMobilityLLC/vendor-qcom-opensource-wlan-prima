@@ -4212,20 +4212,6 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
         return eHAL_STATUS_RESOURCES;
     }
 
-    status = palTimerAlloc(pMac->hHdd, &pNeighborRoamInfo->emptyScanRefreshTimer,
-                csrNeighborRoamEmptyScanRefreshTimerCallback,
-                (void *)&pNeighborRoamInfo->neighborScanTimerInfo);
-
-    if (eHAL_STATUS_SUCCESS != status)
-    {
-        smsLog(pMac, LOGE, FL("Empty scan refresh timer allocation failed"));
-        vos_mem_free(pNeighborRoamInfo->cfgParams.channelInfo.ChannelList);
-        pNeighborRoamInfo->cfgParams.channelInfo.ChannelList = NULL;
-        palTimerFree(pMac->hHdd, pNeighborRoamInfo->neighborScanTimer);
-        palTimerFree(pMac->hHdd, pNeighborRoamInfo->neighborResultsRefreshTimer);
-        return eHAL_STATUS_RESOURCES;
-    }
-
     status = csrLLOpen(pMac->hHdd, &pNeighborRoamInfo->roamableAPList);
     if (eHAL_STATUS_SUCCESS != status)
     {
