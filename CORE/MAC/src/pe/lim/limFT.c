@@ -1080,7 +1080,11 @@ void limProcessMlmFTReassocReq(tpAniSirGlobal pMac, tANI_U32 *pMsgBuf,
     psessionEntry->transactionId = transactionId;
 
 
-
+    if (NULL == pMac->ft.ftPEContext.pAddBssReq)
+    {
+        limLog(pMac, LOGE, FL("pAddBssReq is NULL"));
+        return;
+    }
     if( eHAL_STATUS_SUCCESS != palAllocateMemory( pMac->hHdd, (void **)&pMlmReassocReq,
         sizeof(tLimMlmReassocReq)))
     {
@@ -1213,6 +1217,7 @@ void limProcessFTPreauthRspTimeout(tpAniSirGlobal pMac)
 
     // We have failed pre auth. We need to resume link and get back on
     // home channel.
+    limLog(pMac, LOG1, FL("FT Pre-Auth Time Out!!!!"));
 
     if((psessionEntry = peFindSessionBySessionId(pMac, pMac->lim.limTimers.gLimFTPreAuthRspTimer.sessionId))== NULL) 
     {
