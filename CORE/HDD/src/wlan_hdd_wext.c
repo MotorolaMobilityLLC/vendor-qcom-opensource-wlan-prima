@@ -6253,7 +6253,8 @@ void wlan_hdd_set_mc_v6(hdd_adapter_t *pAdapter, v_U8_t set) {
 void wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set)
 {
     v_U8_t i;
-
+    v_U8_t filterAction;
+    tPacketFilterCfg request; 
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     // IKJB42MAIN-1244, Motorola, a19091 - BEGIN
     int ret;
@@ -6266,13 +6267,7 @@ void wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set)
         return;
     }
 
-    hHal = pHddCtx->hHal;
-
-    if (NULL == hHal)
-    {
-        hddLog(VOS_TRACE_LEVEL_ERROR, FL("HAL Handle is NULL"));
-        return;
-    }
+    filterAction = set ? HDD_RCV_FILTER_SET : HDD_RCV_FILTER_CLEAR;
 
     // IKJB42MAIN-1244, Motorola, a19091 - BEGIN
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: Entered for %s",

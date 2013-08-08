@@ -4071,6 +4071,7 @@ static VOS_STATUS wlan_ftm_priv_set_mac_address(hdd_adapter_t *pAdapter,char *bu
        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,\
                  "pMacAddress[%d] = %02x:%02x:%02x:%02x:%02x:%02x",\
                  macLoop,\
+                 MAC_ADDR_ARRAY(&pMacAddress[macLoop * VOS_MAX_CONCURRENCY_PERSONA]));
 
        printk(KERN_INFO "pMacAddress[%d] = %02x:%02x:%02x:%02x:%02x:%02x\n",\
               macLoop,\
@@ -4463,7 +4464,7 @@ static int iw_ftm_get_char_setnone(struct net_device *dev, struct iw_request_inf
     return 0;
 }
 
-VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len, v_U16_t table)
+VOS_STATUS wlan_write_to_efs (v_U8_t *pData, v_U16_t data_len)
 {
 #if defined(MSM_PLATFORM)
     tAniHdr *wmsg = NULL;
