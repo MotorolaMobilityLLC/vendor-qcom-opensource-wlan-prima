@@ -5656,7 +5656,6 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
                     reasonCode = eCSR_DISCONNECT_REASON_UNSPECIFIED;
                     break;
             }
-            pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
             (WLAN_HDD_GET_CTX(pAdapter))->isAmpAllowed = VOS_TRUE;
             INIT_COMPLETION(pAdapter->disconnect_comp_var);
 
