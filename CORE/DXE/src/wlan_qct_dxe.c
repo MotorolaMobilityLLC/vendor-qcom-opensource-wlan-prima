@@ -2219,11 +2219,9 @@ static wpt_status dxeRXFrameReady
          HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_WARN,
                   "dxeRXFrameReady %s RING Wrapped, RX Free Low 0x%x",
                   channelType[channelEntry->channelType], chStat);
-         /* This is not empty interrupt case
-          * If handle this as empty interrupt, false SSR might be issued
-          * Frame count '1' is dummy frame count to avoid SSR */
-         channelEntry->numFragmentCurrentChain = 1;
-         return eWLAN_PAL_STATUS_SUCCESS;
+         channelEntry->numFragmentCurrentChain = 0;
+         channelEntry->hitLowResource = eWLAN_PAL_TRUE;
+         return eWLAN_PAL_STATUS_E_RESOURCES;
       }
 
       currentCtrlBlk = channelEntry->headCtrlBlk;
