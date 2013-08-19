@@ -2729,6 +2729,7 @@ WLANTL_GetSTALinkCapacity
 );
 
 /*===========================================================================
+=======
   FUNCTION   WLANTL_TxThreadDebugHandler
 
   DESCRIPTION
@@ -2742,12 +2743,13 @@ WLANTL_GetSTALinkCapacity
   PARAMETERS
 
     IN
-    pvosGCtx:    Pointer to the global vos context; a handle to TL's
+    pvosGCtx:       pointer to the global vos context; a handle to TL's
                     or WDA's control block can be extracted from its context
 
-  RETURN VALUE   None
+  RETURN VALUE      None
 
   SIDE EFFECTS
+
 ============================================================================*/
 
 v_VOID_t
