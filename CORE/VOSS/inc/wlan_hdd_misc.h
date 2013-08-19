@@ -52,6 +52,10 @@
 #ifdef WLAN_NV_OTA_UPGRADE
 #define WLAN_NV_FILE_REGULATORY    "wlan/prima/WCNSS_qcom_wlan_nv_regulatory.bin"
 #define WLAN_NV_FILE_CALIBRATION  "wlan/prima/WCNSS_qcom_wlan_nv_calibration.bin"
+// BEGIN IKJB42MAIN-9117, qjiang1, 04/10/2013
+#define WLAN_NV_FILE_REGULATORY_M    "wlan/prima/WCNSS_qcom_wlan_nv_regulatory_m.bin"
+#define WLAN_NV_FILE_CALIBRATION_M   "wlan/prima/WCNSS_qcom_wlan_nv_calibration_m.bin"
+// END IKJB42MAIN-9117
 #endif
 #define WLAN_COUNTRY_INFO_FILE     "wlan/prima/WCNSS_wlan_country_info.dat"
 #define WLAN_HO_CFG_FILE           "wlan/prima/WCNSS_wlan_ho_config"
