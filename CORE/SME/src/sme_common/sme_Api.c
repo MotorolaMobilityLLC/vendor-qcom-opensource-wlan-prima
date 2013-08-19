@@ -6267,7 +6267,6 @@ eHalStatus sme_ReceiveFilterSetFilter(tHalHandle hHal, tpSirRcvPktFilterCfgType 
         vos_mem_free(pRequestBuf);
         return eHAL_STATUS_FAILURE;
     }
-    
     vos_mem_copy( pRcvPktFilterCfg->selfMacAddr, pSession->selfMacAddr, sizeof(tSirMacAddr));
     vos_mem_copy( pRcvPktFilterCfg->bssId, pSession->connectedProfile.bssid, 
                           sizeof(tSirMacAddr));
