@@ -582,7 +582,6 @@ VOS_STATUS vos_nv_open(void)
     }
     #endif
 
-
      /* Copying the read nv data to the globa NV EFS table */
     {
         /* Allocate memory to global NV table */
