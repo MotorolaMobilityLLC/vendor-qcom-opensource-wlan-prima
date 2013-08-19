@@ -2738,7 +2738,8 @@ VOS_STATUS hdd_release_firmware(char *pFileName,v_VOID_t *pCtx)
    }
 
 #ifdef WLAN_NV_OTA_UPGRADE /* Motorola OTA changes */
-   else if (!strcmp(WLAN_NV_FILE_REGULATORY,pFileName)) {
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+   else if (!strcmp(WLAN_NV_FILE_REGULATORY,pFileName) || !strcmp(WLAN_NV_FILE_REGULATORY_M,pFileName) ) {
        if(pHddCtx->nv_reg) {
           release_firmware(pHddCtx->nv_reg);
           pHddCtx->nv_reg = NULL;
@@ -2747,7 +2748,8 @@ VOS_STATUS hdd_release_firmware(char *pFileName,v_VOID_t *pCtx)
           status = VOS_STATUS_E_FAILURE;
 
    }
-   else if (!strcmp(WLAN_NV_FILE_CALIBRATION,pFileName)) {
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+   else if (!strcmp(WLAN_NV_FILE_CALIBRATION,pFileName) || !strcmp(WLAN_NV_FILE_CALIBRATION_M,pFileName) ) {
        if(pHddCtx->nv_cal) {
           release_firmware(pHddCtx->nv_cal);
           pHddCtx->nv_cal = NULL;
@@ -2822,7 +2824,8 @@ VOS_STATUS hdd_request_firmware(char *pfileName,v_VOID_t *pCtx,v_VOID_t **ppfw_d
    }
 
    #ifdef WLAN_NV_OTA_UPGRADE /* Motorola OTA changes */
-   else if(!strcmp(WLAN_NV_FILE_REGULATORY, pfileName)) {
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+   else if(!strcmp(WLAN_NV_FILE_REGULATORY, pfileName) || !strcmp(WLAN_NV_FILE_REGULATORY_M, pfileName) ) {
 
        status = request_firmware(&pHddCtx->nv_reg, pfileName, pHddCtx->parent_dev);
 
@@ -2838,7 +2841,8 @@ VOS_STATUS hdd_request_firmware(char *pfileName,v_VOID_t *pCtx,v_VOID_t **ppfw_d
                  __func__, *pSize);
        }
    }
-   else if(!strcmp(WLAN_NV_FILE_CALIBRATION, pfileName)) {
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+   else if(!strcmp(WLAN_NV_FILE_CALIBRATION, pfileName) || !strcmp(WLAN_NV_FILE_CALIBRATION_M, pfileName) ) {
 
        status = request_firmware(&pHddCtx->nv_cal, pfileName, pHddCtx->parent_dev);
 

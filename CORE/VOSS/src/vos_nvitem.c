@@ -65,6 +65,9 @@
 #include "vos_sched.h"
 #include "wlan_hdd_main.h"
 #include <net/cfg80211.h>
+
+#include <linux/of.h> /* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+
 static char crda_alpha2[2] = {0, 0}; /* country code from initial crda req */
 static char run_time_alpha2[2] = {0, 0}; /* country code from none-default country req */
 static v_BOOL_t crda_regulatory_entry_valid = VOS_FALSE;
@@ -520,6 +523,38 @@ VOS_STATUS vos_nv_init(void)
    return VOS_STATUS_SUCCESS;
 }
 
+/* BEGIN IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+static int device_is_obakem(void)
+{
+    struct device_node *chosen;
+    static int device_type = -1;  /* 1 for obakem, 0 for non-obakem, -1 for unset */
+    u32 product;
+
+    if ( device_type != -1 )
+        return device_type;
+
+    chosen = of_find_node_by_path("/Chosen@0");
+    if ( !chosen ){
+        pr_err("%s: fail to find node Chosen@0 \n", __func__ );
+        device_type = 0;
+        return device_type;
+    }
+
+    if (of_property_read_u32(chosen, "product", &product)) {
+        pr_err("%s: fail to find product property \n", __func__);
+        device_type = 0;
+    } else {
+        if ( product == 0x000028ff )/* obakem product value */
+            device_type = 1;
+        else
+            device_type = 0;
+        pr_info("%s: product type is %s \n", __func__, (device_type? "obakem": "not obakem") );
+    }
+
+    return device_type;
+}
+/* END IKJB42MAIN-9117*/
+
 VOS_STATUS vos_nv_open(void)
 {
     VOS_STATUS status = VOS_STATUS_SUCCESS;
@@ -552,10 +587,12 @@ VOS_STATUS vos_nv_open(void)
     bufSize_reg = sizeof(nvEFSTable_reg_t);
     bufSize_cal = sizeof(nvEFSTable_cal_t);
 
-    status_reg = hdd_request_firmware(WLAN_NV_FILE_REGULATORY,
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+    status_reg = hdd_request_firmware( ( device_is_obakem() ? WLAN_NV_FILE_REGULATORY_M : WLAN_NV_FILE_REGULATORY),
                                   ((VosContextType*)(pVosContext))->pHDDContext,
                                   (v_VOID_t**)&gnvRegTable, &bufSize_reg);
-    status_cal = hdd_request_firmware(WLAN_NV_FILE_CALIBRATION,
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+    status_cal = hdd_request_firmware(( device_is_obakem() ? WLAN_NV_FILE_CALIBRATION_M : WLAN_NV_FILE_CALIBRATION),
                                   ((VosContextType*)(pVosContext))->pHDDContext,
                                   (v_VOID_t**)&gnvCalTable, &bufSize_cal);
 
@@ -992,7 +1029,8 @@ VOS_STATUS vos_nv_close(void)
 #ifdef WLAN_NV_OTA_UPGRADE
     if(gnvRegTable != NULL)
     {
-        status = hdd_release_firmware(WLAN_NV_FILE_REGULATORY, ((VosContextType*)(pVosContext))->pHDDContext);
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+        status = hdd_release_firmware(( device_is_obakem() ? WLAN_NV_FILE_REGULATORY_M : WLAN_NV_FILE_REGULATORY), ((VosContextType*)(pVosContext))->pHDDContext);
         if ( !VOS_IS_STATUS_SUCCESS( status ))
         {
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -1003,7 +1041,8 @@ VOS_STATUS vos_nv_close(void)
 
     if(gnvCalTable != NULL)
     {
-        status = hdd_release_firmware(WLAN_NV_FILE_CALIBRATION, ((VosContextType*)(pVosContext))->pHDDContext);
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+        status = hdd_release_firmware(( device_is_obakem() ? WLAN_NV_FILE_CALIBRATION_M : WLAN_NV_FILE_CALIBRATION), ((VosContextType*)(pVosContext))->pHDDContext);
         if ( !VOS_IS_STATUS_SUCCESS( status ))
         {
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -1655,11 +1694,12 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
 
     bufSize_reg = sizeof(nvEFSTable_reg_t);
     bufSize_cal = sizeof(nvEFSTable_cal_t);
-
-    status_reg = hdd_request_firmware(WLAN_NV_FILE_REGULATORY,
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+    status_reg = hdd_request_firmware(( device_is_obakem()? WLAN_NV_FILE_REGULATORY_M : WLAN_NV_FILE_REGULATORY),
                                   ((VosContextType*)(pVosContext))->pHDDContext,
                                   (v_VOID_t**)&gnvRegTable, &bufSize_reg);
-    status_cal = hdd_request_firmware(WLAN_NV_FILE_CALIBRATION,
+/* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
+    status_cal = hdd_request_firmware(( device_is_obakem()? WLAN_NV_FILE_CALIBRATION_M : WLAN_NV_FILE_CALIBRATION),
                                   ((VosContextType*)(pVosContext))->pHDDContext,
                                   (v_VOID_t**)&gnvCalTable, &bufSize_cal);
 
