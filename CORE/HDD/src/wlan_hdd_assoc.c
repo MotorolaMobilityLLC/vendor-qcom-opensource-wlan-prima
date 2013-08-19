@@ -123,6 +123,11 @@ static eHalStatus hdd_RoamSetKeyCompleteHandler( hdd_adapter_t *pAdapter,
                                                 tANI_U32 roamId,
                                                 eRoamCmdStatus roamStatus,
                                                 eCsrRoamResult roamResult );
+#ifdef WLAN_FEATURE_PACKET_FILTERING
+extern int wlan_hdd_update_v6_filters(hdd_adapter_t *pAdapter, v_U8_t set); // IKJB42MAIN-1244, Motorola, a19091
+#endif
+
+void hdd_ResetCountryCodeAfterDisAssoc(hdd_adapter_t *pAdapter);
 
 v_VOID_t hdd_connSetConnectionState( hdd_station_ctx_t *pHddStaCtx,
                                         eConnectionState connState )
@@ -1136,6 +1141,10 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
             pAdapter->wapi_info.fIsWapiSta = 0;
         }
 #endif  /* FEATURE_WLAN_WAPI */
+
+        // IKJB42MAIN-1244, Motorola, a19091 - START
+        wlan_hdd_update_v6_filters(pAdapter, (pAdapter->mc_addr_list.mc_cnt==0)?1:0);
+        // IKJB42MAIN-1244, Motorola, a19091 - END
 
         // indicate 'connect' status to userspace
         hdd_SendAssociationEvent(dev,pRoamInfo);
