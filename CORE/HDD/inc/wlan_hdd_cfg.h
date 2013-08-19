@@ -1718,6 +1718,20 @@ typedef enum
 #define CFG_DISABLE_LDPC_WITH_TXBF_AP_DEFAULT     ( 0 )
 #endif
 
+
+/*
++ * SAP/P2P-GO mode traffic monitor
++ */
+#define CFG_ENABLE_TRAFFIC_MONITOR                "gEnableTrafficMonitor"
+#define CFG_ENABLE_TRAFFIC_MONITOR_MIN            ( 0 )
+#define CFG_ENABLE_TRAFFIC_MONITOR_MAX            ( 1 )
+#define CFG_ENABLE_TRAFFIC_MONITOR_DEFAULT        ( 0 )
+
+#define CFG_TRAFFIC_IDLE_TIMEOUT                  "gTrafficIdleTimeout"
+#define CFG_TRAFFIC_IDLE_TIMEOUT_MIN              ( 3000 )
+#define CFG_TRAFFIC_IDLE_TIMEOUT_MAX              ( 10000 )
+#define CFG_TRAFFIC_IDLE_TIMEOUT_DEFAULT          ( 5000 )
+
 #define CFG_LIST_OF_NON_DFS_COUNTRY_CODE                    "gListOfNonDfsCountryCode"
 #define CFG_LIST_OF_NON_DFS_COUNTRY_CODE_DEFAULT            "JO,MA"
 

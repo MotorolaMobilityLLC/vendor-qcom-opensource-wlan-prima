@@ -560,9 +560,7 @@ VOS_STATUS hdd_softap_init_tx_rx( hdd_adapter_t *pAdapter )
                            HDD_SOFTAP_VI_WEIGHT_DEFAULT, 
                            HDD_SOFTAP_VO_WEIGHT_DEFAULT
                          };
-
    hdd_context_t *pHddCtx = NULL;
-
    pAdapter->isVosOutOfResource = VOS_FALSE;
 
    vos_mem_zero(&pAdapter->stats, sizeof(struct net_device_stats));
@@ -631,6 +629,27 @@ VOS_STATUS hdd_softap_init_tx_rx( hdd_adapter_t *pAdapter )
 VOS_STATUS hdd_softap_deinit_tx_rx( hdd_adapter_t *pAdapter )
 {
    VOS_STATUS status = VOS_STATUS_SUCCESS;
+   hdd_context_t *pHddCtx = NULL;
+
+   pHddCtx = (hdd_context_t *)pAdapter->pHddCtx;
+   if (NULL == pHddCtx)
+   {
+      VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ERROR,
+                 "%s: Invalid HDD cntxt", __func__ );
+      return VOS_STATUS_E_INVAL;
+   }
+   if (pHddCtx->traffic_monitor.isInitialized)
+   {
+      if (VOS_TIMER_STATE_STOPPED !=
+          vos_timer_getCurrentState(&pHddCtx->traffic_monitor.trafficTimer))
+      {
+         vos_timer_stop(&pHddCtx->traffic_monitor.trafficTimer);
+      }
+      vos_timer_destroy(&pHddCtx->traffic_monitor.trafficTimer);
+      vos_lock_destroy(&pHddCtx->traffic_monitor.trafficLock);
+      pHddCtx->traffic_monitor.isInitialized = 0;
+   }
+
    hdd_context_t *pHddCtx = NULL;
 
    pHddCtx = (hdd_context_t *)pAdapter->pHddCtx;
@@ -939,7 +958,6 @@ VOS_STATUS hdd_softap_tx_fetch_packet_cbk( v_VOID_t *vosContext,
       VOS_ASSERT(0);
       return VOS_STATUS_E_FAILURE;
    }
- 
    /* Monitor traffic */
    if ( pHddCtx->cfg_ini->enableTrafficMonitor )
    {
@@ -1255,7 +1273,6 @@ VOS_STATUS hdd_softap_rx_packet_cbk( v_VOID_t *vosContext,
       VOS_ASSERT(0);
       return VOS_STATUS_E_FAILURE;
    }
-
    /* Monitor traffic */
    if ( pHddCtx->cfg_ini->enableTrafficMonitor )
    {
