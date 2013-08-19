@@ -3904,7 +3904,6 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
         case WE_SET_CHANNEL_RANGE:
         {
             int startChannel, endChannel;
-
             if (set_value == 3) {
                 startChannel = 153;
                 endChannel   = 165;
@@ -3917,7 +3916,9 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
             } else {
                 set_value = 0;
                 startChannel = 1;
-                endChannel   = 11;
+                //BEGIN MOT a19110 IKJBXLINE-2149 MHS frequency band support
+                endChannel   = 14;
+                //END IKJBXLINE-2149
             }
 
             ret = iw_softap_set_channel_range( dev, startChannel, endChannel, set_value);
@@ -4355,7 +4356,6 @@ static int iw_get_char_setnone(struct net_device *dev, struct iw_request_info *i
             v_U8_t i, len;
             char* buf ;
             tChannelListInfo channel_list;
-
             status = iw_softap_get_channel_list(dev, info, wrqu, (char *)&channel_list);
             if ( !VOS_IS_STATUS_SUCCESS( status ) ) 
             {
