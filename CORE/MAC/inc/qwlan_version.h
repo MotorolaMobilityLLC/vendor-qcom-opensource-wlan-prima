@@ -62,7 +62,7 @@ BRIEF DESCRIPTION:
 #define QWLAN_VERSION_EXTRA            ""
 #define QWLAN_VERSION_BUILD            101
 
-#define QWLAN_VERSIONSTR               "3.2.3.93_0416.1"
+#define QWLAN_VERSIONSTR               "3.2.3.93_0422.1"
 
 #endif /* QWLAN_VERSION_H */
 
