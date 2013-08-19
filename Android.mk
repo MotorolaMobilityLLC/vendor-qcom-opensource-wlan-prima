@@ -51,6 +51,17 @@ LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
 endif
 include $(BUILD_PREBUILT)
 
+# calibration obakeM data
+ifdef WIFI_DRIVER_CAL_FILE_M
+include $(CLEAR_VARS)
+LOCAL_MODULE       := WCNSS_qcom_wlan_nv_calibration_m.bin
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_CAL_FILE_M)
+include $(BUILD_PREBUILT)
+endif
+
 # calibration data will need to be overlay'd per product
 include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv_calibration.bin
@@ -63,6 +74,17 @@ else
 LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
 endif
 include $(BUILD_PREBUILT)
+
+# regulatory obakeM data
+ifdef WIFI_DRIVER_REG_FILE_M
+include $(CLEAR_VARS)
+LOCAL_MODULE       := WCNSS_qcom_wlan_nv_regulatory_m.bin
+LOCAL_MODULE_TAGS  := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH  := $(TARGET_OUT_ETC)/firmware/wlan/prima
+LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_REG_FILE_M)
+include $(BUILD_PREBUILT)
+endif
 
 include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv_regulatory.bin
