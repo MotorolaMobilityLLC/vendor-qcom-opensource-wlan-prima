@@ -649,28 +649,6 @@ VOS_STATUS hdd_softap_deinit_tx_rx( hdd_adapter_t *pAdapter )
       vos_lock_destroy(&pHddCtx->traffic_monitor.trafficLock);
       pHddCtx->traffic_monitor.isInitialized = 0;
    }
-
-   hdd_context_t *pHddCtx = NULL;
-
-   pHddCtx = (hdd_context_t *)pAdapter->pHddCtx;
-   if (NULL == pHddCtx)
-   {
-      VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ERROR,
-                 "%s: Invalid HDD cntxt", __func__ );
-      return VOS_STATUS_E_INVAL;
-   }
-   if (pHddCtx->traffic_monitor.isInitialized)
-   {
-      if (VOS_TIMER_STATE_STOPPED !=
-          vos_timer_getCurrentState(&pHddCtx->traffic_monitor.trafficTimer))
-      {
-         vos_timer_stop(&pHddCtx->traffic_monitor.trafficTimer);
-      }
-      vos_timer_destroy(&pHddCtx->traffic_monitor.trafficTimer);
-      vos_lock_destroy(&pHddCtx->traffic_monitor.trafficLock);
-      pHddCtx->traffic_monitor.isInitialized = 0;
-   }
-
    status = hdd_softap_flush_tx_queues(pAdapter);
 
    return status;
