@@ -1666,6 +1666,8 @@ int iw_softap_get_channel_list(struct net_device *dev,
     tpChannelListInfo channel_list = (tpChannelListInfo) extra;
     eCsrBand curBand = eCSR_BAND_ALL;
 
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
+
     if (eHAL_STATUS_SUCCESS != sme_GetFreqBand(hHal, &curBand))
     {
         hddLog(LOGE,FL("not able get the current frequency band\n"));

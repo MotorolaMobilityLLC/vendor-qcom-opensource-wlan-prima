@@ -39,6 +39,7 @@ else
        DLKM_DIR := build/dlkm
 endif
 
+# For the proprietary driver the firmware files are handled here
 include $(CLEAR_VARS)
 LOCAL_MODULE       := WCNSS_qcom_wlan_nv.bin
 LOCAL_MODULE_TAGS  := optional
@@ -70,7 +71,7 @@ LOCAL_MODULE_PATH  := $(PRODUCT_OUT)/persist
 ifdef WIFI_DRIVER_CAL_FILE
 LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_CAL_FILE)
 else
-LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+LOCAL_SRC_FILES    := firmware_bin/WCNSS_qcom_wlan_nv_calibration.bin
 endif
 include $(BUILD_PREBUILT)
 
@@ -107,7 +108,7 @@ LOCAL_MODULE_PATH  := $(PRODUCT_OUT)/persist
 ifdef WIFI_DRIVER_REG_FILE
 LOCAL_SRC_FILES    := ../../../../../$(WIFI_DRIVER_REG_FILE)
 else
-LOCAL_SRC_FILES    := firmware_bin/$(LOCAL_MODULE)
+LOCAL_SRC_FILES    := firmware_bin/WCNSS_qcom_wlan_nv_regulatory.bin
 endif
 include $(BUILD_PREBUILT)
 
@@ -209,10 +210,6 @@ KBUILD_OPTIONS += MODNAME=wlan
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(WLAN_SELECT)
 
-
-VERSION=$(shell grep -w "VERSION =" $(TOP)/kernel/Makefile | sed 's/^VERSION = //' )
-PATCHLEVEL=$(shell grep -w "PATCHLEVEL =" $(TOP)/kernel/Makefile | sed 's/^PATCHLEVEL = //' )
-
 include $(CLEAR_VARS)
 LOCAL_MODULE              := $(WLAN_CHIPSET)_wlan.ko
 LOCAL_MODULE_KBUILD_NAME  := wlan.ko
@@ -233,6 +230,7 @@ $(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
         $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin; \
         ln -sf /data/misc/wifi/WCNSS_qcom_cfg.ini \
         $(TARGET_OUT_ETC)/firmware/wlan/prima/WCNSS_qcom_cfg.ini)
+
 else
 $(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
         ln -sf /persist/WCNSS_qcom_wlan_nv.bin \
@@ -244,5 +242,6 @@ $(shell mkdir -p $(TARGET_OUT_ETC)/firmware/wlan/prima; \
 
 endif
 
-endif
-endif # 8960 target check
+endif # DLKM check
+
+endif # supported target check
