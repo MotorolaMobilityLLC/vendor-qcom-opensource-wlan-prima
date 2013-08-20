@@ -1901,28 +1901,6 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
                status = VOS_STATUS_E_INVAL;
            }
            else {
-                memcpy(&gnvEFSTable->halnv.tables.fwConfig,inputVoidBuffer,bufferSize);
-                #ifdef WLAN_NV_OTA_UPGRADE
-                    if(three_files == 1)
-                    {
-                        nv_type = 2;
-                        memcpy(&gnvCalTable->fwConfig,inputVoidBuffer,bufferSize);
-                    }
-                #endif
-            }
-            break;
-        case VNV_FW_CONFIG:
-        
-           itemSize = sizeof(gnvEFSTable->halnv.tables.fwConfig);
-        
-           if(bufferSize != itemSize) {
-        
-               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                ("type = %d buffer size=%d is less than data size=%d\r\n"),type, bufferSize,
-                 itemSize);
-               status = VOS_STATUS_E_INVAL;
-           }
-           else {
                memcpy(&gnvEFSTable->halnv.tables.fwConfig,inputVoidBuffer,bufferSize);
            }
            break;
