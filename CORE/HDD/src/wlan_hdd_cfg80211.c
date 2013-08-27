@@ -5708,6 +5708,7 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
         {
             eCsrRoamDisconnectReason reasonCode =
                                        eCSR_DISCONNECT_REASON_UNSPECIFIED;
+            hdd_scaninfo_t *pScanInfo;
             switch(reason)
             {
                 case WLAN_REASON_MIC_FAILURE:
@@ -5732,6 +5733,13 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
             }
             (WLAN_HDD_GET_CTX(pAdapter))->isAmpAllowed = VOS_TRUE;
             INIT_COMPLETION(pAdapter->disconnect_comp_var);
+            pScanInfo =  &pHddCtx->scan_info;
+            if (pScanInfo->mScanPending)
+            {
+               hddLog(VOS_TRACE_LEVEL_INFO, "Disconnect is in progress, "
+                              "Aborting Scan");
+                hdd_abort_mac_scan(pHddCtx);
+            }
 
 #ifdef FEATURE_WLAN_TDLS
             /* First clean up the tdls peers if any */
