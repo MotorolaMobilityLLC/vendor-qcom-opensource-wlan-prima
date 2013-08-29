@@ -1052,29 +1052,6 @@ void hdd_suspend_wlan(void)
        }
 #endif
 
-
-   //BEGIN MOT IKJB42MAIN-1268 DTIM enhancement
-   if (eConnectionState_Associated == (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
-   {
-      tHalHandle halHandle = WLAN_HDD_GET_HAL_CTX(pAdapter);
-      tpPESession sessionPtr = NULL;
-      sessionPtr = peFindSessionBySessionId((tpAniSirGlobal)halHandle, pAdapter->sessionId);
-      if(sessionPtr != NULL)
-      {
-          if(sessionPtr->lastBeaconDtimPeriod <= 3)
-          {
-              pHddCtx->cfg_ini->enableModulatedDTIM=0;
-              pHddCtx->cfg_ini->enableDynamicDTIM=3;
-          }
-          else
-          {
-              pHddCtx->cfg_ini->enableModulatedDTIM=1;
-              pHddCtx->cfg_ini->enableDynamicDTIM=0;
-          }
-      }
-   }
-   //END IKJB42MAIN-1268
-
        /*Suspend notification sent down to driver*/
        hdd_conf_suspend_ind(pHddCtx, pAdapter);
 
