@@ -788,6 +788,7 @@ void hdd_suspend_wlan(void)
 {
    hdd_context_t *pHddCtx = NULL;
    v_CONTEXT_t pVosContext = NULL;
+   bool hdd_enter_bmps = FALSE;
 
    hdd_adapter_t *pAdapter = NULL; 
    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
@@ -817,6 +818,8 @@ void hdd_suspend_wlan(void)
    }
 
    /*loop through all adapters. TBD fix for Concurrency */
+   hdd_set_pwrparams(pHddCtx);
+
    status =  hdd_get_front_adapter ( pHddCtx, &pAdapterNode );
    while ( NULL != pAdapterNode && VOS_STATUS_SUCCESS == status )
    {
@@ -831,6 +834,19 @@ void hdd_suspend_wlan(void)
            continue;
        }
 
+       /* Avoid multiple enter/exit BMPS in this while loop using
+	* hdd_enter_bmps flag
+	*/
+	if (FALSE == hdd_enter_bmps && (BMPS == pmcGetPmcState(pHddCtx->hHal)))
+	{
+             hdd_enter_bmps = TRUE;
+             /* If device was already in BMPS, and dynamic DTIM is set,
+              * exit(set the device to full power) and enter BMPS again
+              * to reflect new DTIM value */
+	     wlan_hdd_enter_bmps(pAdapter, DRIVER_POWER_MODE_ACTIVE);
+	     wlan_hdd_enter_bmps(pAdapter, DRIVER_POWER_MODE_AUTO);
+	     pHddCtx->hdd_ignore_dtim_enabled = TRUE;
+        }
 #ifdef SUPPORT_EARLY_SUSPEND_STANDBY_DEEPSLEEP
        if (pHddCtx->cfg_ini->nEnableSuspend == WLAN_MAP_SUSPEND_TO_STANDBY)
        {
@@ -1165,6 +1181,7 @@ void hdd_resume_wlan(void)
 
          powerRequest.uIgnoreDTIM = pHddCtx->hdd_actual_ignore_DTIM_value;
          powerRequest.uListenInterval = pHddCtx->hdd_actual_LI_value;
+         powerRequest.uMaxLIModulatedDTIM = pHddCtx->cfg_ini->fMaxLIModulatedDTIM;
 
          /*Disabled ModulatedDTIM if enabled on suspend*/
          if(pHddCtx->cfg_ini->enableModulatedDTIM)
@@ -1629,6 +1646,7 @@ err_vosclose:
 err_re_init:
    /* Allow the phone to go to sleep */
    hdd_allow_suspend();
+   VOS_BUG(0);
    return -EPERM;
 
 success:

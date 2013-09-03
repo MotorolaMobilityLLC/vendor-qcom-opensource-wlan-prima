@@ -4311,6 +4311,7 @@ static eHalStatus hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
     if (!req)
     {
         hddLog(VOS_TRACE_LEVEL_ERROR, "request is became NULL\n");
+        pScanInfo->mScanPending = VOS_FALSE;
         goto allow_suspend;
     }
 

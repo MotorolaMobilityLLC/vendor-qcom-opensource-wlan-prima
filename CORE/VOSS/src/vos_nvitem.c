@@ -643,7 +643,7 @@ VOS_STATUS vos_nv_open(void)
             nvReadBufSize = sizeof(sNvFields)+1;
             //return VOS_STATUS_E_RESOURCES;
         }
-       
+
         if ( nvReadBufSize != bufSize)
         {
             VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL, "!!! WARNING !!! Detected NV of size %d bytes, expected %d bytes ",
@@ -666,6 +666,26 @@ VOS_STATUS vos_nv_open(void)
         VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
            "INFO: NV binary file version=%d Driver default NV version=%d, continue...\n",
            gnvEFSTable->halnv.fields.nvVersion, WLAN_NV_VERSION);
+
+       /* Version mismatch */
+       if (gnvEFSTable->halnv.fields.nvVersion != WLAN_NV_VERSION)
+       {
+           if ((WLAN_NV_VERSION == NV_VERSION_11N_11AC_FW_CONFIG) &&
+               (gnvEFSTable->halnv.fields.nvVersion == NV_VERSION_11N_11AC_COUPER_TYPE))
+           {
+               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                     "!!!WARNING: Using Coupler Type field instead of Fw Config table,\n"
+                     "Make sure that this is intented or may impact performance!!!\n");
+           }
+           else
+           {
+               VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+                     "!!!WARNING: NV binary file version doesn't match with Driver default NV version\n"
+                     "Driver NV defaults will be used, may impact performance!!!\n");
+
+               return VOS_STATUS_SUCCESS;
+           }
+       }
 
        pnvEFSTable->nvValidityBitmap = gnvEFSTable->nvValidityBitmap;
         /* Copy the valid fields to the NV Global structure */ 
@@ -1901,9 +1921,16 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
                status = VOS_STATUS_E_INVAL;
            }
            else {
-               memcpy(&gnvEFSTable->halnv.tables.fwConfig,inputVoidBuffer,bufferSize);
-           }
-           break;
+                memcpy(&gnvEFSTable->halnv.tables.fwConfig,inputVoidBuffer,bufferSize);
+                #ifdef WLAN_NV_OTA_UPGRADE
+                    if(three_files == 1)
+                    {
+                        nv_type = 2;
+                        memcpy(&gnvCalTable->fwConfig,inputVoidBuffer,bufferSize);
+                    }
+                #endif
+            }
+            break;
         case VNV_ANTENNA_PATH_LOSS:
             itemSize = sizeof(gnvEFSTable->halnv.tables.antennaPathLoss);
             if(bufferSize != itemSize) {
