@@ -1809,10 +1809,13 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
       if (! VOS_IS_STATUS_SUCCESS(status)) {
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs failed!!!\r\n"));
           status = VOS_STATUS_E_FAULT;
-          goto exit;
+          goto try_perist_and_exit;
       }
 
+try_perist_and_exit:
 #ifdef WLAN_NV_OTA_UPGRADE
+      if(type != VNV_FIELD_IMAGE)
+          goto exit;
       status = wlan_write_to_efs((v_U8_t*)gnvFactoryTable,sizeof(nvEFSTable_factory_t));
       if (! VOS_IS_STATUS_SUCCESS(status))
       {
