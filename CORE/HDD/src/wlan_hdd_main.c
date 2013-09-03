@@ -5897,7 +5897,7 @@ int hdd_wlan_startup(struct device *dev )
       /* Action frame registered in one adapter which will
        * applicable to all interfaces 
        */
-      wlan_hdd_cfg80211_post_voss_start(pP2pAdapter);
+      wlan_hdd_cfg80211_post_voss_start(pAdapter);
    }
 
    mutex_init(&pHddCtx->sap_lock);
