@@ -7429,10 +7429,13 @@ static int wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
     }
 
     /* framework provides interval in ms */
-    pPnoRequest->scanTimers.ucScanTimersCount = 1;
-    pPnoRequest->scanTimers.aTimerValues[0].uTimerValue =
-          (request->interval)/1000;
-    pPnoRequest->scanTimers.aTimerValues[0].uTimerRepeat = 0;
+    //BEGIN MOT a19110 IKJBMR2-1528 set PNO intervals
+    pPnoRequest->scanTimers.ucScanTimersCount = 2;
+    pPnoRequest->scanTimers.aTimerValues[0].uTimerRepeat = 7;
+    pPnoRequest->scanTimers.aTimerValues[0].uTimerValue = 45;
+    pPnoRequest->scanTimers.aTimerValues[1].uTimerRepeat = 0;
+    pPnoRequest->scanTimers.aTimerValues[1].uTimerValue = 480;
+    //END IKJBMR2-1528
     pPnoRequest->modePNO = SIR_PNO_MODE_ON_SUSPEND;
 
     status = sme_SetPreferredNetworkList(WLAN_HDD_GET_HAL_CTX(pAdapter),
