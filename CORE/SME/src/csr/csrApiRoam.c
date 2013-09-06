@@ -200,7 +200,7 @@ static const tANI_U8 csrStartIbssChannels24[ CSR_NUM_IBSS_START_CHANNELS_24 ] = 
 static void initConfigParam(tpAniSirGlobal pMac);
 static tANI_BOOLEAN csrRoamProcessResults( tpAniSirGlobal pMac, tSmeCmd *pCommand,
                                        eCsrRoamCompleteResult Result, void *Context );
-static eHalStatus csrRoamStartIbss( tpAniSirGlobal pMac, tANI_U32 sessionId, 
+static eHalStatus csrRoamStartIbss( tpAniSirGlobal pMac, tANI_U32 sessionId,
                                     tCsrRoamProfile *pProfile, 
                                     tANI_BOOLEAN *pfSameIbss );
 static void csrRoamUpdateConnectedProfileFromNewBss( tpAniSirGlobal pMac, tANI_U32 sessionId, tSirSmeNewBssInfo *pNewBss );
@@ -13177,24 +13177,22 @@ eHalStatus csrProcessAddStaSessionRsp( tpAniSirGlobal pMac, tANI_U8 *pMsg)
    } while(0);
    return status;
 }
-eHalStatus csrSendMBAddSelfStaReqMsg(tpAniSirGlobal pMac, tAddStaForSessionCmd *pAddStaReq)
+eHalStatus csrSendMBAddSelfStaReqMsg( tpAniSirGlobal pMac, tSirMacAddr macAddr )
 {
    tSirSmeAddStaSelfReq *pMsg;
    tANI_U16 msgLen;
    eHalStatus status = eHAL_STATUS_FAILURE;
    do {
-      msgLen  = sizeof(tSirSmeAddStaSelfReq);
+      msgLen  = sizeof( tANI_U16 ) + sizeof( tANI_U16 ) + sizeof( tSirMacAddr ) /*+
+         sizeof( tSirBssType )*/;
       status = palAllocateMemory(pMac->hHdd, (void **)&pMsg, msgLen);
       if ( !HAL_STATUS_SUCCESS(status) ) break;
       palZeroMemory(pMac->hHdd, pMsg, msgLen);
       pMsg->mesgType = pal_cpu_to_be16((tANI_U16)eWNI_SME_ADD_STA_SELF_REQ);
       pMsg->mesgLen = pal_cpu_to_be16(msgLen);
       // self station address
-      palCopyMemory(pMac->hHdd, (tANI_U8 *)pMsg->selfMacAddr,
-                   (tANI_U8 *)&pAddStaReq->selfMacAddr, sizeof(tSirMacAddr));
-      pMsg->currDeviceMode = pAddStaReq->currDeviceMode;
-
-      smsLog( pMac, LOG1, FL("selfMac=%02x, %02x, %02x, %02x, %02x, %02x"),
+      palCopyMemory( pMac->hHdd, (tANI_U8 *)pMsg->selfMacAddr, (tANI_U8 *)macAddr, sizeof(tSirMacAddr) );
+        smsLog( pMac, LOG1, FL("selfMac=%02x, %02x, %02x, %02x, %02x, %02x"),
             pMsg->selfMacAddr[0],
             pMsg->selfMacAddr[1],
             pMsg->selfMacAddr[2],
@@ -13205,8 +13203,7 @@ eHalStatus csrSendMBAddSelfStaReqMsg(tpAniSirGlobal pMac, tAddStaForSessionCmd *
    } while( 0 );
    return( status );
 }
-eHalStatus csrIssueAddStaForSessionReq(tpAniSirGlobal pMac, tANI_U32 sessionId,
-                                       tSirMacAddr sessionMacAddr)
+eHalStatus csrIssueAddStaForSessionReq(tpAniSirGlobal pMac, tANI_U32 sessionId, tSirMacAddr sessionMacAddr)
 {
    eHalStatus status = eHAL_STATUS_SUCCESS;
    tSmeCmd *pCommand;
@@ -13219,8 +13216,7 @@ eHalStatus csrIssueAddStaForSessionReq(tpAniSirGlobal pMac, tANI_U32 sessionId,
    {
       pCommand->command = eSmeCommandAddStaSession;
       pCommand->sessionId = (tANI_U8)sessionId;
-      palCopyMemory(pMac->hHdd, pCommand->u.addStaSessionCmd.selfMacAddr, sessionMacAddr, sizeof(tSirMacAddr));
-      pCommand->u.addStaSessionCmd.currDeviceMode = pMac->sme.currDeviceMode;
+      palCopyMemory( pMac->hHdd, pCommand->u.addStaSessionCmd.selfMacAddr, sessionMacAddr, sizeof( tSirMacAddr ) );
       status = csrQueueSmeCommand(pMac, pCommand, TRUE);
       if( !HAL_STATUS_SUCCESS( status ) )
       {
@@ -13232,11 +13228,11 @@ eHalStatus csrIssueAddStaForSessionReq(tpAniSirGlobal pMac, tANI_U32 sessionId,
 }
 eHalStatus csrProcessAddStaSessionCommand( tpAniSirGlobal pMac, tSmeCmd *pCommand )
 {
-   return csrSendMBAddSelfStaReqMsg( pMac, &pCommand->u.addStaSessionCmd);
+   return csrSendMBAddSelfStaReqMsg( pMac,
+         pCommand->u.addStaSessionCmd.selfMacAddr );
 }
-eHalStatus csrRoamOpenSession(tpAniSirGlobal pMac,
-                              csrRoamCompleteCallback callback, void *pContext,
-                              tANI_U8 *pSelfMacAddr, tANI_U8 *pbSessionId)
+eHalStatus csrRoamOpenSession( tpAniSirGlobal pMac, csrRoamCompleteCallback callback, void *pContext,
+                          tANI_U8 *pSelfMacAddr, tANI_U8 *pbSessionId )
 {
     eHalStatus status = eHAL_STATUS_SUCCESS;
     tANI_U32 i;
@@ -13279,7 +13275,7 @@ eHalStatus csrRoamOpenSession(tpAniSirGlobal pMac,
                 smsLog(pMac, LOGE, FL("cannot allocate memory for IbssJoining timer"));
                 break;
             }
-            status = csrIssueAddStaForSessionReq(pMac, i, pSelfMacAddr);
+            status = csrIssueAddStaForSessionReq ( pMac, i, pSelfMacAddr );
             break;
         }
     }
