@@ -342,6 +342,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WLAN_STATS_TX_MC_BYTE_CNT     20
 #define WLAN_STATS_TX_BC_BYTE_CNT     21
 
+#define WLAN_SET_ROAM_TRIGGER        (SIOCIWFIRSTPRIV + 28)
+
 #define FILL_TLV(__p, __type, __size, __val, __tlen) do {           \
         if ((__tlen + __size + 2) < WE_MAX_STR_LEN)                 \
         {                                                           \
@@ -3028,6 +3030,87 @@ static int iw_get_linkspeed_priv(struct net_device *dev,
    vos_ssr_unprotect(__func__);
 
    return ret;
+}
+
+// A utility function to check whether x is numeric
+static bool isNumericChar(char x)
+{
+    return (x >= '0' && x <= '9')? true: false;
+}
+
+// A simple atoi() function. If the given string contains
+// any invalid character, then this function returns 0
+static int wlanAtoi(char *str)
+{
+    int res = 0;  // Initialize result
+    int sign = 1;  // Initialize sign as positive
+    int i = 0;  // Initialize index of first digit
+
+    if (*str == '\0') {
+       return 0;
+    }
+
+    // If number is negative, then update sign
+    if (str[0] == '-') {
+        sign = -1;
+        i++;  // Also update index of first digit
+    }
+
+    // Iterate through all digits of input string and update result
+    for (; str[i] != '\0'; ++i)
+    {
+        if (isNumericChar(str[i]) == false) {
+            continue; // You may add some lines to write error message
+        }              // to error stream
+        res = res*10 + str[i] - '0';
+    }
+
+    // Return result with sign
+    return sign*res;
+}
+
+static int iw_set_roam_trigger(struct net_device *dev,
+                            struct iw_request_info *info,
+                            union iwreq_data *wrqu, char *extra)
+{
+   hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+   tANI_U8 newLookupRssi = 0;
+   hdd_context_t *pHddCtx = (hdd_context_t*)pAdapter->pHddCtx;
+   static tANI_U8 defaultLookupRssi = 255;
+   char *command = (char*)wrqu->data.pointer;
+   tANI_U8 value = wlanAtoi(command);
+   eHalStatus status = eHAL_STATUS_SUCCESS;
+   newLookupRssi = abs(value);
+
+   VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, "def = %d  and  new = %d\n", defaultLookupRssi, newLookupRssi);
+
+   if (newLookupRssi == 0) {
+       newLookupRssi = defaultLookupRssi;
+   }
+
+   if (defaultLookupRssi == 255) {
+       defaultLookupRssi = pHddCtx->cfg_ini->nNeighborLookupRssiThreshold;
+   }
+
+   pHddCtx->cfg_ini->nNeighborLookupRssiThreshold = newLookupRssi;
+
+   status = sme_setNeighborLookupRssiThreshold((tHalHandle)(pHddCtx->hHal), newLookupRssi);
+   if (eHAL_STATUS_SUCCESS != status)
+   {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+       "%s: Failed to set roam trigger, try again", __func__);
+   }
+
+   /* Set Reassoc threshold to (lookup rssi threshold + 5 dBm) */
+   status = sme_setNeighborReassocRssiThreshold((tHalHandle)(pHddCtx->hHal), newLookupRssi + 5);
+   if (eHAL_STATUS_SUCCESS != status)
+   {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+       "%s: Failed to set roam reassoc, try again", __func__);
+   }
+
+  /* a value is being successfully returned */
+   return 0;
 }
 
 /*
@@ -8854,6 +8937,8 @@ static const iw_handler we_private[] = {
    [WLAN_PRIV_CLEAR_MCBC_FILTER         - SIOCIWFIRSTPRIV]   = iw_clear_dynamic_mcbc_filter,
    [WLAN_SET_POWER_PARAMS               - SIOCIWFIRSTPRIV]   = iw_set_power_params_priv,
    [WLAN_GET_LINK_SPEED                 - SIOCIWFIRSTPRIV]   = iw_get_linkspeed_priv,
+   [WLAN_SET_ROAM_TRIGGER               - SIOCIWFIRSTPRIV]   = iw_set_roam_trigger,
+
 };
 
 /*Maximum command length can be only 15 */
@@ -9358,6 +9443,11 @@ static const struct iw_priv_args we_private_args[] = {
         WLAN_GET_LINK_SPEED,
         IW_PRIV_TYPE_CHAR | 18,
         IW_PRIV_TYPE_CHAR | 5, "getLinkSpeed" },
+    {
+        WLAN_SET_ROAM_TRIGGER,
+        IW_PRIV_TYPE_CHAR | 4,
+        0, "setRoamTrigger" },
+
 };
 
 
