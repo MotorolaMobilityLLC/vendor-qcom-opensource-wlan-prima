@@ -4217,7 +4217,7 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
             hddLog(VOS_TRACE_LEVEL_ERROR, "%s [SSR] send stop ap to supplicant",
                                                        __func__);
             /* event supplicant to restart */
-            cfg80211_stop_ap(pAdapter->dev, GFP_KERNEL);
+            cfg80211_ap_stopped(pAdapter->dev, GFP_KERNEL);
             break;
 
          case WLAN_HDD_MONITOR:
