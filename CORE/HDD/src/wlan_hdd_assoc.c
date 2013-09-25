@@ -124,6 +124,12 @@ static eHalStatus hdd_RoamSetKeyCompleteHandler( hdd_adapter_t *pAdapter,
                                                 eRoamCmdStatus roamStatus,
                                                 eCsrRoamResult roamResult );
 
+static eHalStatus hdd_RoamSetKeyCompleteHandler( hdd_adapter_t *pAdapter,
+                                                tCsrRoamInfo *pRoamInfo,
+                                                tANI_U32 roamId,
+                                                eRoamCmdStatus roamStatus,
+                                                eCsrRoamResult roamResult );
+
 v_VOID_t hdd_connSetConnectionState( hdd_station_ctx_t *pHddStaCtx,
                                         eConnectionState connState )
 {
