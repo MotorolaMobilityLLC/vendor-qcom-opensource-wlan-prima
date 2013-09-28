@@ -644,6 +644,8 @@ int wlan_hdd_cfg80211_init(struct device *dev,
        regulatory settings */
     wiphy->reg_notifier = wlan_hdd_crda_reg_notifier;
 
+    wiphy->flags |= WIPHY_FLAG_DISABLE_11D_HINT_FROM_CORE;
+
     wiphy->max_scan_ssids = MAX_SCAN_SSID;
 
     wiphy->max_scan_ie_len = SIR_MAC_MAX_IE_LENGTH;
