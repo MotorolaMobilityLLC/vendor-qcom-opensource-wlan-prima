@@ -222,7 +222,7 @@ eHalStatus sme_Stop(tHalHandle hHal, tANI_BOOLEAN pmcFlag);
   \sa
   
   --------------------------------------------------------------------------*/
-eHalStatus sme_OpenSession(tHalHandle hHal, csrRoamCompleteCallback callback, void *pContext, 
+eHalStatus sme_OpenSession(tHalHandle hHal, csrRoamCompleteCallback callback, void *pContext,
                            tANI_U8 *pSelfMacAddr, tANI_U8 *pbSessionId);
 
 
@@ -2817,4 +2817,9 @@ eHalStatus sme_SetPhyMode(tHalHandle hHal, eCsrPhyMode phyMode);
   -------------------------------------------------------------------------------*/
 eCsrPhyMode sme_GetPhyMode(tHalHandle hHal);
 
+/*
+ * sme API to find if any infra station or P2P-Client is connected
+ * return status
+*/
+VOS_STATUS sme_isSta_p2p_clientConnected(tHalHandle hHal);
 #endif //#if !defined( __SME_API_H )
