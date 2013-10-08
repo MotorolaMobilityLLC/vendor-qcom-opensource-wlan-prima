@@ -5165,15 +5165,17 @@ typedef PACKED_PRE struct PACKED_POST
 }  tSetPrefNetwListResp, *tpSetPrefNetwListResp;
 
 /*
-  Preferred network indication parameters 
+  Preferred network indication parameters
 */
 typedef PACKED_PRE struct PACKED_POST {
 
   /*Network that was found with the highest RSSI*/
   tSirMacSSid ssId;
-  
+
   /*Indicates the RSSI */
   tANI_U8     rssi;
+
+  tANI_U16    frameLength;
 
 } tPrefNetwFoundParams, * tpPrefNetwFoundParams;
 
@@ -5596,9 +5598,6 @@ typedef PACKED_PRE struct PACKED_POST
 
   /* Beacon Early Termination Interval */
   tANI_U32 uBETInterval; 
-
-  /* MAX LI for modulated DTIM */
-  tANI_U32 uMaxLIModulatedDTIM;
 }tSetPowerParamsType, *tpSetPowerParamsType;
 
 typedef PACKED_PRE struct PACKED_POST
