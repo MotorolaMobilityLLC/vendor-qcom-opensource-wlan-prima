@@ -33,11 +33,7 @@ else
     WLAN_BLD_DIR := vendor/qcom/opensource/wlan
 endif
 
-ifeq ($(call is-android-codename,JELLY_BEAN),true)
-       DLKM_DIR := $(TOP)/device/qcom/common/dlkm
-else
-       DLKM_DIR := build/dlkm
-endif
+DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 
 ifeq ($(WLAN_PROPRIETARY),1)
 # For the proprietary driver the firmware files are handled here
