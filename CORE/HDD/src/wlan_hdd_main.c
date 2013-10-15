@@ -3557,6 +3557,28 @@ void hdd_set_pwrparams(hdd_context_t *pHddCtx)
            continue;
        }
 
+       //BEGIN MOT IKJB42MAIN-1268 DTIM enhancement
+       if (eConnectionState_Associated == (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)
+       {
+           tHalHandle halHandle = WLAN_HDD_GET_HAL_CTX(pAdapter);
+           tpPESession sessionPtr = NULL;
+           sessionPtr = peFindSessionBySessionId((tpAniSirGlobal)halHandle, pAdapter->sessionId);
+           if(sessionPtr != NULL)
+           {
+               if(sessionPtr->lastBeaconDtimPeriod <= 3)
+               {
+                   pHddCtx->cfg_ini->enableModulatedDTIM=0;
+                   pHddCtx->cfg_ini->enableDynamicDTIM=3;
+               }
+               else
+               {
+                   pHddCtx->cfg_ini->enableModulatedDTIM=1;
+                   pHddCtx->cfg_ini->enableDynamicDTIM=0;
+               }
+           }
+        }
+        //END IKJB42MAIN-1268
+
        //Apply Dynamic DTIM For P2P
        //Only if ignoreDynamicDtimInP2pMode is not set in ini
       if ((pHddCtx->cfg_ini->enableDynamicDTIM ||
