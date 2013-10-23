@@ -2748,6 +2748,13 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
 
                 hdd_set_ap_ops( pAdapter->dev );
 
+                /* set country code for SAP not for P2P GO  */
+                if (NL80211_IFTYPE_AP == type)
+                {
+                   sme_ChangeCountryCode(pHddCtx->hHal, NULL,
+                            pConfig->apCntryCode, pAdapter, pHddCtx->pvosContext);
+                }
+
                 status = hdd_init_ap_mode(pAdapter);
                 if(status != VOS_STATUS_SUCCESS)
                 {
