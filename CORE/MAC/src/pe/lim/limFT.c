@@ -780,6 +780,9 @@ void limFTProcessPreAuthResult(tpAniSirGlobal pMac, eHalStatus status, tANI_U32 
     if (!pMac->ft.ftPEContext.pFTPreAuthReq)
         return;
 
+    if (!pMac->ft.ftPEContext.pFTPreAuthReq)
+        return;
+
     psessionEntry = (tpPESession)data;
 
     if (pMac->ft.ftPEContext.ftPreAuthStatus == eSIR_SUCCESS)
