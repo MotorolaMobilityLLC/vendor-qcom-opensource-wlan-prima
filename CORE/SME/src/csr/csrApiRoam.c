@@ -2851,9 +2851,16 @@ static eHalStatus csrRoamGetQosInfoFromBss(tpAniSirGlobal pMac, tSirBssDescripti
       //check if the AP is QAP & it supports APSD
       if( CSR_IS_QOS_BSS(pIes) )
       {
-         return eHAL_STATUS_SUCCESS;
+         status = eHAL_STATUS_SUCCESS;
       }
    } while (0);
+
+
+   if (NULL != pIes)
+   {
+       palFreeMemory(pMac->hHdd, pIes);
+   }
+
    return status;
 }
 
