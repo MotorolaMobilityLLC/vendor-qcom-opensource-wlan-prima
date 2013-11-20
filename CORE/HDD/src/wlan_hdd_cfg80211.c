@@ -2043,7 +2043,8 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
          (pConfig->SapHw_mode == eSAP_DOT11_MODE_11n_ONLY)) &&
         (((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_AUTO) ||
          ((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac) ||
-         ((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY)) )
+         ((WLAN_HDD_GET_CTX(pHostapdAdapter))->cfg_ini->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY)) &&
+           (sme_isHostFeatSupported(DOT11AC)) && (sme_isFwFeatSupported(DOT11AC)) )
     {
         pConfig->SapHw_mode = eSAP_DOT11_MODE_11ac;
     }
