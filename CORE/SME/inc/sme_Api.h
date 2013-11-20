@@ -2822,4 +2822,27 @@ eCsrPhyMode sme_GetPhyMode(tHalHandle hHal);
  * return status
 */
 VOS_STATUS sme_isSta_p2p_clientConnected(tHalHandle hHal);
+
+/*----------------------------------------------------------------------------
+
+  \brief sme_isHostFeatSupported() - SME interface to determine the given feature
+   is supported by HOST or not.
+
+  \param featCap - Feature support
+
+  \return 1 on feature supported, 0 on feature not supported.
+-----------------------------------------------------------------------------*/
+tANI_U8 sme_isHostFeatSupported(tANI_U8 featCap);
+
+/*----------------------------------------------------------------------------
+
+  \brief sme_isFwFeatureSupported() - SME interface to determine the given feature
+   is supported by HOST or not.
+
+  \param featCap - Feature support
+
+  \return 1 on feature supported, 0 on feature not supported.
+-----------------------------------------------------------------------------*/
+tANI_U8 sme_isFwFeatSupported(tANI_U8 featCap);
+
 #endif //#if !defined( __SME_API_H )

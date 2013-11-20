@@ -6858,7 +6858,35 @@ void sme_disableFeatureCapablity(tANI_U8 feature_index)
     WDA_disableCapablityFeature(feature_index);
 }
 
+/*----------------------------------------------------------------------------
 
+  \brief sme_isHostFeatSupported() - SME interface to determine the given feature
+   is supported by HOST or not.
+
+  \param featCap - Feature support
+
+  \return 1 on feature supported, 0 on feature not supported.
+-----------------------------------------------------------------------------*/
+
+tANI_U8 sme_isHostFeatSupported(tANI_U8 featCap)
+{
+    return WDA_getHostWlanFeatCaps(featCap);
+}
+
+/*----------------------------------------------------------------------------
+
+  \brief sme_isFwFeatureSupported() - SME interface to determine the given feature
+   is supported by HOST or not.
+
+  \param featCap - Feature support
+
+  \return 1 on feature supported, 0 on feature not supported.
+-----------------------------------------------------------------------------*/
+
+tANI_U8 sme_isFwFeatSupported(tANI_U8 featCap)
+{
+    return WDA_getFwWlanFeatCaps(featCap);
+}
 
 /* ---------------------------------------------------------------------------
 
