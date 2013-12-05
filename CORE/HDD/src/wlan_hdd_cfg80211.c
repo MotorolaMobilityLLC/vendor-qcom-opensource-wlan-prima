@@ -5870,7 +5870,8 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
     if (NULL != pRoamProfile)
     {
         /*issue disconnect request to SME, if station is in connected state*/
-        if (pHddStaCtx->conn_info.connState == eConnectionState_Associated)
+        if ((pHddStaCtx->conn_info.connState == eConnectionState_Associated) ||
+            (pHddStaCtx->conn_info.connState == eConnectionState_Connecting))
         {
             eCsrRoamDisconnectReason reasonCode =
                                        eCSR_DISCONNECT_REASON_UNSPECIFIED;
@@ -5947,6 +5948,12 @@ static int wlan_hdd_cfg80211_disconnect( struct wiphy *wiphy,
             /*stop tx queues*/
             netif_tx_disable(dev);
             netif_carrier_off(dev);
+        }
+        else
+        {
+            hddLog(VOS_TRACE_LEVEL_ERROR, "%s: unexpected cfg disconnect API"
+                   "called while in %d state", __func__,
+                    pHddStaCtx->conn_info.connState);
         }
     }
     else
