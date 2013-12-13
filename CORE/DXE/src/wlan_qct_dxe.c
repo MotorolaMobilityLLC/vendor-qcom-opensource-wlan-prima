@@ -96,7 +96,7 @@ when           who        what, where, why
 #define T_WLANDXE_MAX_FRAME_SIZE           2000
 #define T_WLANDXE_TX_INT_ENABLE_FCOUNT     1
 #define T_WLANDXE_MEMDUMP_BYTE_PER_LINE    16
-#define T_WLANDXE_MAX_RX_PACKET_WAIT       3000
+#define T_WLANDXE_MAX_RX_PACKET_WAIT       6000
 #define T_WLANDXE_PERIODIC_HEALTH_M_TIME   2500
 #define T_WLANDXE_MAX_HW_ACCESS_WAIT       2000
 #define WLANDXE_MAX_REAPED_RX_FRAMES       512
