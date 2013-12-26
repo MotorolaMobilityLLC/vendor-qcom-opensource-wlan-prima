@@ -1476,7 +1476,7 @@ void pmmEnterImpsRequestHandler (tpAniSirGlobal pMac)
         if (!(pMac->pmc.ImpsReqFailCnt & 0xF))
         {
             pePrintActiveSession(pMac);
-            macTraceDumpAll(pMac,0,0,100);
+            vosTraceDumpAll(pMac,0,0,100,0);
         }
         resultCode = eSIR_SME_INVALID_STATE;
         pmmLog(pMac, LOGE, FL("Session is active go to failure resultCode = "
