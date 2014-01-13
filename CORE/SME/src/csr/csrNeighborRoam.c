@@ -699,6 +699,8 @@ static void csrNeighborRoamDeregAllRssiIndication(tpAniSirGlobal pMac)
         pNeighborRoamInfo->uEmptyScanCount = 0;
         pNeighborRoamInfo->lookupDOWNRssi = 0;
         pNeighborRoamInfo->uScanMode = DEFAULT_SCAN;
+        pNeighborRoamInfo->uEmptyScanRefreshTimerCount = 1;
+        pNeighborRoamInfo->emptyScanTotalTime = 0;
 #endif
 }
 
@@ -1631,6 +1633,7 @@ static VOS_STATUS csrNeighborRoamHandleEmptyScanResult(tpAniSirGlobal pMac)
     VOS_STATUS  vosStatus = VOS_STATUS_SUCCESS;
     tpCsrNeighborRoamControlInfo    pNeighborRoamInfo = &pMac->roam.neighborRoamInfo;
     eHalStatus  status = eHAL_STATUS_SUCCESS;
+    tANI_U8 scanPeriodCount = 0;
 #ifdef FEATURE_WLAN_LFR
     tANI_BOOLEAN performPeriodicScan =
         (pNeighborRoamInfo->cfgParams.emptyScanRefreshPeriod) ? TRUE : FALSE;
@@ -1743,29 +1746,42 @@ static VOS_STATUS csrNeighborRoamHandleEmptyScanResult(tpAniSirGlobal pMac)
              * Set uEmptyScanCount to MAX so that we always enter this
              * condition on subsequent empty scan results
              */
+            scanPeriodCount = pNeighborRoamInfo->uEmptyScanRefreshTimerCount;
             pNeighborRoamInfo->uEmptyScanCount = eMaxEmptyScan;
+            pNeighborRoamInfo->emptyScanTotalTime =
+                    pNeighborRoamInfo->cfgParams.emptyScanRefreshPeriod*scanPeriodCount;
 
             /* From here on, ONLY scan on channels in the occupied list */
             pNeighborRoamInfo->uScanMode = SPLIT_SCAN_OCCUPIED_LIST;
-
+            if ( pNeighborRoamInfo->emptyScanTotalTime >
+                              pNeighborRoamInfo->cfgParams.emptyScanMaxPeriod)
+            {
+                smsLog(pMac, LOG1, FL("emptyScanTotalTime %d is reached. Current Max period configured %d"),
+                        pNeighborRoamInfo->emptyScanTotalTime,
+                        pNeighborRoamInfo->cfgParams.emptyScanMaxPeriod);
+                pNeighborRoamInfo->emptyScanTotalTime = pNeighborRoamInfo->cfgParams.emptyScanMaxPeriod;
+            }
             /* Start empty scan refresh timer */
             if (eHAL_STATUS_SUCCESS !=
                 palTimerStart(pMac->hHdd, pNeighborRoamInfo->emptyScanRefreshTimer,
-                    pNeighborRoamInfo->cfgParams.emptyScanRefreshPeriod * PAL_TIMER_TO_MS_UNIT,
-                    eANI_BOOLEAN_FALSE))
+                        pNeighborRoamInfo->emptyScanTotalTime * PAL_TIMER_TO_MS_UNIT,
+                       eANI_BOOLEAN_FALSE))
             {
-                smsLog(pMac, LOGE, FL("Empty scan refresh timer failed to start (%d)"),
-                        status);
-                vos_mem_free(pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList);
-                pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList = NULL;
-                pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels = 0;
-                vosStatus = VOS_STATUS_E_FAILURE;
+                 smsLog(pMac, LOGE, FL("Empty scan refresh timer failed to start (%d) scanTime %d"),
+                        status, pNeighborRoamInfo->emptyScanTotalTime);
+                 vos_mem_free(pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList);
+                 pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.ChannelList = NULL;
+                 pNeighborRoamInfo->roamChannelInfo.currentChannelListInfo.numOfChannels = 0;
+                 vosStatus = VOS_STATUS_E_FAILURE;
             }
             else
             {
-                smsLog(pMac, LOGE, FL("Empty scan refresh timer started (%ld ms)"),
-                        (pNeighborRoamInfo->cfgParams.emptyScanRefreshPeriod));
+                smsLog(pMac, LOGE, FL("Empty scan refresh timer started (%ld ms) ,scanPeriodCount - %d "),
+                       (pNeighborRoamInfo->emptyScanTotalTime),scanPeriodCount);
             }
+            if (pNeighborRoamInfo->emptyScanTotalTime !=
+                       pNeighborRoamInfo->cfgParams.emptyScanMaxPeriod)
+            pNeighborRoamInfo->uEmptyScanRefreshTimerCount *= 2;
         }
         else if (eThirdEmptyScan == pNeighborRoamInfo->uEmptyScanCount)
         {
@@ -3990,6 +4006,8 @@ eHalStatus csrNeighborRoamIndicateConnect(tpAniSirGlobal pMac, tANI_U8 sessionId
             pNeighborRoamInfo->uEmptyScanCount = 0;
             pNeighborRoamInfo->lookupDOWNRssi = 0;
             pNeighborRoamInfo->uScanMode = DEFAULT_SCAN;
+            pNeighborRoamInfo->uEmptyScanRefreshTimerCount = 1;
+            pNeighborRoamInfo->emptyScanTotalTime = 0;
 #endif
 
             
@@ -4172,6 +4190,7 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
     pNeighborRoamInfo->cfgParams.neighborScanPeriod = pMac->roam.configParam.neighborRoamConfig.nNeighborScanTimerPeriod;
     pNeighborRoamInfo->cfgParams.neighborResultsRefreshPeriod = pMac->roam.configParam.neighborRoamConfig.nNeighborResultsRefreshPeriod;
     pNeighborRoamInfo->cfgParams.emptyScanRefreshPeriod = pMac->roam.configParam.neighborRoamConfig.nEmptyScanRefreshPeriod;
+    pNeighborRoamInfo->cfgParams.emptyScanMaxPeriod = pMac->roam.configParam.neighborRoamConfig.nEmptyScanMaxPeriod;
 
 #if  defined (WLAN_FEATURE_VOWIFI_11R) || defined (FEATURE_WLAN_CCX) || defined(FEATURE_WLAN_LFR)
     pNeighborRoamInfo->cfgParams.countryChannelInfo.revision = SME_KR_25;
@@ -4209,6 +4228,8 @@ eHalStatus csrNeighborRoamInit(tpAniSirGlobal pMac)
     pNeighborRoamInfo->uScanMode = DEFAULT_SCAN;
     palZeroMemory(pMac->hHdd, &pNeighborRoamInfo->prevConnProfile,
                   sizeof(tCsrRoamConnectedProfile));
+    pNeighborRoamInfo->uEmptyScanRefreshTimerCount = 1;
+    pNeighborRoamInfo->emptyScanTotalTime = 0;
 #endif
     pNeighborRoamInfo->scanRspPending = eANI_BOOLEAN_FALSE;
 

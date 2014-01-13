@@ -7658,6 +7658,39 @@ eHalStatus sme_UpdateEmptyScanRefreshPeriod(tHalHandle hHal, v_U16_t nEmptyScanR
     return status ;
 }
 
+
+/* ---------------------------------------------------------------------------
+    \fn sme_UpdateEmptyScanMaxPeriod
+    \brief  Update nEmptyScanMaxPeriod
+            This function is called through dynamic setConfig callback function
+            to configure nEmptyScanMaxPeriod
+            Usage: adb shell iwpriv wlan0 setConfig nEmptyScanMaxPeriod=[300 .. 1200]
+    \param  hHal - HAL handle for device
+    \param  nEmptyScanMaxPeriod - emptyScan duration.
+    \- return Success or failure
+    -------------------------------------------------------------------------*/
+
+eHalStatus sme_UpdateEmptyScanMaxPeriod(tHalHandle hHal, v_U32_t nEmptyScanMaxPeriod)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    eHalStatus          status    = eHAL_STATUS_SUCCESS;
+
+    status = sme_AcquireGlobalLock( &pMac->sme );
+    if ( HAL_STATUS_SUCCESS( status ) )
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_DEBUG,
+                     "LFR runtime successfully set roam scan period to %d - old value is %d - roam state is %d",
+                     nEmptyScanMaxPeriod,
+                     pMac->roam.configParam.neighborRoamConfig.nEmptyScanMaxPeriod,
+                     pMac->roam.neighborRoamInfo.neighborRoamState);
+        pMac->roam.configParam.neighborRoamConfig.nEmptyScanMaxPeriod = nEmptyScanMaxPeriod;
+        pMac->roam.neighborRoamInfo.cfgParams.emptyScanMaxPeriod = nEmptyScanMaxPeriod;
+        sme_ReleaseGlobalLock( &pMac->sme );
+    }
+
+    return status ;
+}
+
 /* ---------------------------------------------------------------------------
     \fn sme_setNeighborScanMinChanTime
     \brief  Update nNeighborScanMinChanTime
