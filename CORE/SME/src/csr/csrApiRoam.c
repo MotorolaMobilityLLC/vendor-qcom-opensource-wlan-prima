@@ -971,6 +971,7 @@ static void initConfigParam(tpAniSirGlobal pMac)
     pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.channelList[2] = 11;
     pMac->roam.configParam.neighborRoamConfig.nNeighborResultsRefreshPeriod = 20000; //20 seconds
     pMac->roam.configParam.neighborRoamConfig.nEmptyScanRefreshPeriod = 0;
+    pMac->roam.configParam.neighborRoamConfig.nEmptyScanMaxPeriod = 0;
 #endif
 #ifdef WLAN_FEATURE_11AC
      pMac->roam.configParam.nVhtChannelWidth = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ + 1;
@@ -1566,6 +1567,7 @@ eHalStatus csrChangeDefaultConfigParam(tpAniSirGlobal pMac, tCsrConfigParam *pPa
         smsLog( pMac, LOG1, "nMaxNeighborRetries = %d", pMac->roam.configParam.neighborRoamConfig.nMaxNeighborRetries);
         smsLog( pMac, LOG1, "nNeighborResultsRefreshPeriod = %d", pMac->roam.configParam.neighborRoamConfig.nNeighborResultsRefreshPeriod);
         smsLog( pMac, LOG1, "nEmptyScanRefreshPeriod = %d", pMac->roam.configParam.neighborRoamConfig.nEmptyScanRefreshPeriod);
+        smsLog( pMac, LOG1, "nEmptyScanMaxPeriod = %d", pMac->roam.configParam.neighborRoamConfig.nEmptyScanMaxPeriod);
         {
            int i;
            smsLog( pMac, LOG1, FL("Num of Channels in CFG Channel List: %d"), pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.numChannels);

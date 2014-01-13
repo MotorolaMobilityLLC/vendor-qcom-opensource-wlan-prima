@@ -2506,6 +2506,19 @@ v_U16_t sme_getEmptyScanRefreshPeriod(tHalHandle hHal);
     -------------------------------------------------------------------------*/
 eHalStatus sme_UpdateEmptyScanRefreshPeriod(tHalHandle hHal, v_U16_t nEmptyScanRefreshPeriod);
 
+
+/* ---------------------------------------------------------------------------
+    \fn sme_UpdateEmptyScanMaxPeriod
+    \brief  Update nEmptyScanMaxPeriod
+            This function is called through dynamic setConfig callback function
+            to configure nEmptyScanMaxPeriod
+            Usage: adb shell iwpriv wlan0 setConfig nEmptyScanMaxPeriod=[300 .. 1200]
+    \param  hHal - HAL handle for device
+    \param  nEmptyScanMaxPeriod - emptyScan duration.
+    \- return Success or failure
+    -------------------------------------------------------------------------*/
+eHalStatus sme_UpdateEmptyScanMaxPeriod(tHalHandle hHal, v_U32_t nEmptyScanMaxPeriod);
+
 /* ---------------------------------------------------------------------------
     \fn sme_setNeighborScanMinChanTime
     \brief  Update nNeighborScanMinChanTime

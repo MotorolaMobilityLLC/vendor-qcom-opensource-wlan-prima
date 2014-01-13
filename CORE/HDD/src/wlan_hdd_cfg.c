@@ -172,6 +172,11 @@ static void cbNotifySetEmptyScanRefreshPeriod(hdd_context_t *pHddCtx, unsigned l
     sme_UpdateEmptyScanRefreshPeriod((tHalHandle)(pHddCtx->hHal), pHddCtx->cfg_ini->nEmptyScanRefreshPeriod);
 }
 
+static void cbNotifySetEmptyScanMaxPeriod(hdd_context_t *pHddCtx, unsigned long NotifyId)
+{
+    // at the point this routine is called, the value in the cfg_ini table has already been updated
+    sme_UpdateEmptyScanMaxPeriod((tHalHandle)(pHddCtx->hHal),  pHddCtx->cfg_ini->nEmptyScanMaxPeriod);
+}
 static void cbNotifySetNeighborScanMinChanTime(hdd_context_t *pHddCtx, unsigned long NotifyId)
 {
     // at the point this routine is called, the value in the cfg_ini table has already been updated
@@ -1562,6 +1567,16 @@ REG_TABLE_ENTRY g_registry_table[] =
                          CFG_EMPTY_SCAN_REFRESH_PERIOD_MIN,
                          CFG_EMPTY_SCAN_REFRESH_PERIOD_MAX,
                          cbNotifySetEmptyScanRefreshPeriod, 0 ),
+
+
+   REG_DYNAMIC_VARIABLE( CFG_EMPTY_SCAN_MAX_PERIOD_NAME, WLAN_PARAM_Integer,
+                         hdd_config_t, nEmptyScanMaxPeriod,
+                         VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+                         CFG_EMPTY_SCAN_MAX_PERIOD_DEFAULT,
+                         CFG_EMPTY_SCAN_MAX_PERIOD_MIN,
+                         CFG_EMPTY_SCAN_MAX_PERIOD_MAX,
+                         cbNotifySetEmptyScanMaxPeriod, 0 ),
+
 #endif /* WLAN_FEATURE_NEIGHBOR_ROAMING */
 
    REG_VARIABLE( CFG_QOS_WMM_BURST_SIZE_DEFN_NAME , WLAN_PARAM_Integer,
@@ -2599,6 +2614,7 @@ static void print_hdd_cfg(hdd_context_t *pHddCtx)
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [nNeighborScanPeriod] Value = [%lu] ",pHddCtx->cfg_ini->nNeighborScanPeriod);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [nNeighborScanResultsRefreshPeriod] Value = [%lu] ",pHddCtx->cfg_ini->nNeighborResultsRefreshPeriod);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [nEmptyScanRefreshPeriod] Value = [%lu] ",pHddCtx->cfg_ini->nEmptyScanRefreshPeriod);
+  VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [nEmptyScanMaxPeriod] Value = [%lu]   ",pHddCtx->cfg_ini->nEmptyScanMaxPeriod);
 #endif
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [burstSizeDefinition] Value = [0x%x] ",pHddCtx->cfg_ini->burstSizeDefinition);
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH, "Name = [tsInfoAckPolicy] Value = [0x%x] ",pHddCtx->cfg_ini->tsInfoAckPolicy);
@@ -3918,6 +3934,8 @@ VOS_STATUS hdd_set_sme_config( hdd_context_t *pHddCtx )
    smeConfig.csrConfig.neighborRoamConfig.nMaxNeighborRetries = pConfig->nMaxNeighborReqTries;
    smeConfig.csrConfig.neighborRoamConfig.nNeighborResultsRefreshPeriod = pConfig->nNeighborResultsRefreshPeriod;
    smeConfig.csrConfig.neighborRoamConfig.nEmptyScanRefreshPeriod = pConfig->nEmptyScanRefreshPeriod;
+   smeConfig.csrConfig.neighborRoamConfig.nEmptyScanMaxPeriod =  pConfig->nEmptyScanMaxPeriod;
+
    hdd_string_to_u8_array( pConfig->neighborScanChanList,
                                         smeConfig.csrConfig.neighborRoamConfig.neighborScanChanList.channelList,
                                         &smeConfig.csrConfig.neighborRoamConfig.neighborScanChanList.numChannels,
