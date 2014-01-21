@@ -230,6 +230,8 @@ static VOS_STATUS hdd_parse_reassoc_command_data(tANI_U8 *pValue,
 VOS_STATUS hdd_parse_get_cckm_ie(tANI_U8 *pValue, tANI_U8 **pCckmIe, tANI_U8 *pCckmIeLen);
 #endif /* FEATURE_WLAN_CCX && FEATURE_WLAN_CCX_UPLOAD */
 
+static VOS_STATUS wlan_hdd_init_channels(hdd_context_t *pHddCtx);
+
 static int hdd_netdev_notifier_call(struct notifier_block * nb,
                                          unsigned long state,
                                          void *ndev)
@@ -7908,19 +7910,13 @@ int hdd_wlan_startup(struct device *dev )
        goto err_vos_nv_close;
    }
 
-   /* registration of wiphy dev with cfg80211 */
-   if (0 > wlan_hdd_cfg80211_register(wiphy))
-   {
-       hddLog(VOS_TRACE_LEVEL_ERROR,"%s: wiphy register failed", __func__);
-       goto err_vos_nv_close;
-   }
 #endif
 
    status = vos_open( &pVosContext, 0);
    if ( !VOS_IS_STATUS_SUCCESS( status ))
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_open failed", __func__);
-      goto err_wiphy_unregister;
+      goto err_vos_nv_close;
    }
 
    pHddCtx->hHal = (tHalHandle)vos_get_context( VOS_MODULE_ID_SME, pVosContext );
@@ -7931,11 +7927,28 @@ int hdd_wlan_startup(struct device *dev )
       goto err_vosclose;
    }
 
+#ifdef CONFIG_ENABLE_LINUX_REG
+   /* registration of wiphy dev with cfg80211 */
+   if (0 > wlan_hdd_cfg80211_register(wiphy))
+   {
+       hddLog(VOS_TRACE_LEVEL_ERROR,"%s: wiphy register failed", __func__);
+       goto err_vosclose;
+   }
+
+    status = wlan_hdd_init_channels(pHddCtx);
+   if ( !VOS_IS_STATUS_SUCCESS( status ) )
+   {
+      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: wlan_hdd_init_channels failed",
+             __func__);
+      goto err_wiphy_unregister;
+   }
+#endif
+
    status = vos_preStart( pHddCtx->pvosContext );
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_preStart failed", __func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    /* Note that the vos_preStart() sequence triggers the cfg download.
@@ -7946,7 +7959,7 @@ int hdd_wlan_startup(struct device *dev )
    if ( VOS_STATUS_SUCCESS != status )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Failed hdd_set_sme_config", __func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    //Initialize the WMM module
@@ -7954,7 +7967,7 @@ int hdd_wlan_startup(struct device *dev )
    if (!VOS_IS_STATUS_SUCCESS(status))
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: hdd_wmm_init failed", __func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    /* In the integrated architecture we update the configuration from
@@ -7965,7 +7978,7 @@ int hdd_wlan_startup(struct device *dev )
    if (FALSE == hdd_update_config_dat(pHddCtx))
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: config update failed",__func__ );
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    // Get mac addr from platform driver
@@ -8047,7 +8060,7 @@ int hdd_wlan_startup(struct device *dev )
       {
          hddLog(VOS_TRACE_LEVEL_ERROR,"%s: Failed to set MAC Address. "
                 "HALStatus is %08d [x%08x]",__func__, halStatus, halStatus );
-         goto err_vosclose;
+         goto err_wiphy_unregister;
       }
    }
 
@@ -8057,7 +8070,7 @@ int hdd_wlan_startup(struct device *dev )
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_start failed",__func__);
-      goto err_vosclose;
+      goto err_wiphy_unregister;
    }
 
    /* Exchange capability info between Host and FW and also get versioning info from FW */
@@ -8345,6 +8358,11 @@ err_close_adapter:
 err_vosstop:
    vos_stop(pVosContext);
 
+err_wiphy_unregister:
+#ifdef CONFIG_ENABLE_LINUX_REG
+   wiphy_unregister(wiphy);
+#endif
+
 err_vosclose:
    status = vos_sched_close( pVosContext );
    if (!VOS_IS_STATUS_SUCCESS(status))    {
@@ -8354,11 +8372,7 @@ err_vosclose:
    }
    vos_close(pVosContext );
 
-err_wiphy_unregister:
-
 #ifdef CONFIG_ENABLE_LINUX_REG
-   wiphy_unregister(wiphy);
-
 err_vos_nv_close:
 
    vos_nv_close();
@@ -9181,6 +9195,37 @@ VOS_STATUS wlan_hdd_restart_driver(hdd_context_t *pHddCtx)
 #endif
  
    return status;
+}
+
+/**---------------------------------------------------------------------------
+ *
+ *   \brief wlan_hdd_init_channels
+ *
+ *   This function is used to initialize the channel list in CSR
+ *
+ *   This function is called from hdd_wlan_startup
+ *
+ *   \param  - pHddCtx: HDD context
+ *
+ *   \return - VOS_STATUS_SUCCESS: Success
+ *             VOS_STATUS_E_FAULT: Failure reported by SME
+
+ * --------------------------------------------------------------------------*/
+static VOS_STATUS wlan_hdd_init_channels(hdd_context_t *pHddCtx)
+{
+   eHalStatus status;
+
+   status = sme_InitChannels(pHddCtx->hHal);
+   if (HAL_STATUS_SUCCESS(status))
+   {
+      return VOS_STATUS_SUCCESS;
+   }
+   else
+   {
+      hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Channel initialization failed(%d)",
+             __func__, status);
+      return VOS_STATUS_E_FAULT;
+   }
 }
 
 /*
