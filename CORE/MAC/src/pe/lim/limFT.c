@@ -729,6 +729,11 @@ tpPESession limFillFTSession(tpAniSirGlobal pMac,
 
     pftSessionEntry->encryptType = psessionEntry->encryptType;
 
+#ifdef WLAN_FEATURE_11AC
+    pftSessionEntry->vhtCapability = psessionEntry->vhtCapability;
+    pftSessionEntry->vhtCapabilityPresentInBeacon = psessionEntry->vhtCapabilityPresentInBeacon;
+#endif
+
     palFreeMemory(pMac->hHdd, pBeaconStruct);
     return pftSessionEntry;
 }
