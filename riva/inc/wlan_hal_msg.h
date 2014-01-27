@@ -6110,6 +6110,7 @@ typedef enum {
     WLAN_PERIODIC_TX_PTRN  = 28,
     ADVANCE_TDLS           = 29,
     BATCH_SCAN             = 30,
+    EXTENDED_NSOFFLOAD_SLOT = 32,
     MAX_FEATURE_SUPPORTED  = 128,
 } placeHolderInCapBitmap;
 
