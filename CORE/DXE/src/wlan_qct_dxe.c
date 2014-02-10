@@ -4486,10 +4486,6 @@ void *WLANDXE_Open
                  dxeRXResourceAvailableTimerExpHandler,
                  tempDxeCtrlBlk);
 
-   wpalTimerInit(&tempDxeCtrlBlk->rxResourceAvailableTimer,
-                 dxeRXResourceAvailableTimerExpHandler,
-                 tempDxeCtrlBlk);
-
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_WARN,
             "WLANDXE_Open Success");
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
@@ -5005,11 +5001,6 @@ wpt_status WLANDXE_Stop
       wpalTimerStop(&dxeCtxt->rxResourceAvailableTimer);
    }
 
-   if(VOS_TIMER_STATE_STOPPED !=
-      wpalTimerGetCurStatus(&dxeCtxt->rxResourceAvailableTimer))
-   {
-      wpalTimerStop(&dxeCtxt->rxResourceAvailableTimer);
-   }
 
    HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_INFO_LOW,
             "%s Exit", __func__);
