@@ -1288,8 +1288,8 @@ VOS_STATUS vos_nv_open(void)
          return VOS_STATUS_E_RESOURCES;
     }
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-           "INFO: [Mot OTA] NV binary file version=%d Driver default NV version=%d, continue...\n",
-           gnvFactoryTable->fields.nvVersion, WLAN_NV_VERSION);
+           "INFO: [Mot OTA] NV factory file version=%d Driver factory NV version=%d, System binary version = %d continue...\n",
+           gnvFactoryTable->fields.nvVersion, WLAN_NV_VERSION, gnvEFSTable->halnv.fields.nvVersion);
 #else /* WLAN_NV_OTA_UPGRADE */
 
     VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
@@ -1348,10 +1348,15 @@ VOS_STATUS vos_nv_open(void)
         {
             if (itemIsValid == VOS_TRUE) {
 #ifdef WLAN_NV_OTA_UPGRADE
-                memcpy((v_VOID_t *)&gnvEFSTable->halnv.fields,
-                   (v_VOID_t *)&gnvFactoryTable->fields, sizeof(sNvFields));
                 memcpy((v_VOID_t *)&pnvEFSTable->halnv.fields,
                    (v_VOID_t *)&gnvFactoryTable->fields, sizeof(sNvFields));
+                if(((VosContextType*)(pVosContext))->nvVersion == E_NV_V2){
+                    memcpy((v_VOID_t *)&gnvEFSTableV2->halnvV2.fields,
+                        (v_VOID_t *)&gnvFactoryTable->fields, sizeof(sNvFields));
+                } else {
+                    memcpy((v_VOID_t *)&gnvEFSTable->halnv.fields,
+                        (v_VOID_t *)&gnvFactoryTable->fields, sizeof(sNvFields));
+                }
             }
 	    else {
 #endif /* WLAN_NV_OTA_UPGRADE */
