@@ -103,6 +103,8 @@
 
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
+#include <linux/inetdevice.h>
+#include <net/addrconf.h>
 #include "wlan_hdd_cfg80211.h"
 #include "wlan_hdd_p2p.h"
 #include <linux/rtnetlink.h>
@@ -212,7 +214,6 @@ static void hdd_set_multicast_list(struct net_device *dev);
 #endif
 
 void hdd_wlan_initial_scan(hdd_adapter_t *pAdapter);
-int isWDresetInProgress(void);
 
 extern int hdd_setBand_helper(struct net_device *dev, tANI_U8* ptr);
 
@@ -5841,6 +5842,14 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
             hdd_deinit_adapter(pHddCtx, pAdapter);
             goto err_free_netdev;
          }
+
+#ifdef WLAN_NS_OFFLOAD
+         // Workqueue which gets scheduled in IPv6 notification callback.
+         INIT_WORK(&pAdapter->ipv6NotifierWorkQueue, hdd_ipv6_notifier_work_queue);
+#endif
+         // Workqueue which gets scheduled in IPv4 notification callback.
+         INIT_WORK(&pAdapter->ipv4NotifierWorkQueue, hdd_ipv4_notifier_work_queue);
+
          //Stop the Interface TX queue.
          netif_tx_disable(pAdapter->dev);
          //netif_tx_disable(pWlanDev);
@@ -5939,7 +5948,6 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          return NULL;
       }
    }
-
 
    if( VOS_STATUS_SUCCESS == status )
    {
@@ -6138,7 +6146,26 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter )
          {
             hdd_abort_mac_scan(pHddCtx);
          }
-
+#ifdef WLAN_NS_OFFLOAD
+#ifdef WLAN_OPEN_SOURCE
+         cancel_work_sync(&pAdapter->ipv6NotifierWorkQueue);
+#endif
+         if (pAdapter->ipv6_notifier_registered)
+         {
+            hddLog(LOG1, FL("Unregistered IPv6 notifier"));
+            unregister_inet6addr_notifier(&pAdapter->ipv6_notifier);
+            pAdapter->ipv6_notifier_registered = false;
+         }
+#endif
+         if (pAdapter->ipv4_notifier_registered)
+         {
+            hddLog(LOG1, FL("Unregistered IPv4 notifier"));
+            unregister_inetaddr_notifier(&pAdapter->ipv4_notifier);
+            pAdapter->ipv4_notifier_registered = false;
+         }
+#ifdef WLAN_OPEN_SOURCE
+         cancel_work_sync(&pAdapter->ipv4NotifierWorkQueue);
+#endif
          if (test_bit(SME_SESSION_OPENED, &pAdapter->event_flags)) 
          {
             INIT_COMPLETION(pAdapter->session_close_comp_var);
@@ -7666,6 +7693,33 @@ static int hdd_generate_iface_mac_addr_auto(hdd_context_t *pHddCtx,
 
 /**---------------------------------------------------------------------------
 
+  \brief hdd_11d_scan_done - callback to be executed when 11d scan is
+                             completed to flush out the scan results
+
+  11d scan is done during driver load and is a passive scan on all
+  channels supported by the device, 11d scans may find some APs on
+  frequencies which are forbidden to be used in the regulatory domain
+  the device is operating in. If these APs are notified to the supplicant
+  it may try to connect to these APs, thus flush out all the scan results
+  which are present in SME after 11d scan is done.
+
+  \return -  eHalStatus
+
+  --------------------------------------------------------------------------*/
+static eHalStatus hdd_11d_scan_done(tHalHandle halHandle, void *pContext,
+                         tANI_U32 scanId, eCsrScanStatus status)
+{
+    ENTER();
+
+    sme_ScanFlushResult(halHandle, 0);
+
+    EXIT();
+
+    return eHAL_STATUS_SUCCESS;
+}
+
+/**---------------------------------------------------------------------------
+
   \brief hdd_wlan_startup() - HDD init function
 
   This is the driver startup code executed once a WLAN device has been detected
@@ -8060,6 +8114,14 @@ int hdd_wlan_startup(struct device *dev )
       goto err_vosclose;
    }
 
+#ifdef FEATURE_WLAN_CH_AVOID
+    /* Plug in avoid channel notification callback
+     * This should happen before ADD_SELF_STA
+     * FW will send first IND with ADD_SELF_STA REQ from host */
+    sme_AddChAvoidCallback(pHddCtx->hHal,
+                           hdd_hostapd_ch_avoid_cb);
+#endif /* FEATURE_WLAN_CH_AVOID */
+
    /* Exchange capability info between Host and FW and also get versioning info from FW */
    hdd_exchange_version_and_caps(pHddCtx);
 
@@ -8183,6 +8245,8 @@ int hdd_wlan_startup(struct device *dev )
    sme_UpdateChannelConfig(pHddCtx->hHal); 
 #endif
 
+   sme_Register11dScanDoneCallback(pHddCtx->hHal, hdd_11d_scan_done);
+
    /* Register with platform driver as client for Suspend/Resume */
    status = hddRegisterPmOps(pHddCtx);
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
@@ -8290,12 +8354,6 @@ int hdd_wlan_startup(struct device *dev )
 #endif
    // Initialize the restart logic
    wlan_hdd_restart_init(pHddCtx);
-
-#ifdef FEATURE_WLAN_CH_AVOID
-    /* Plug in avoid channel notification callback */
-    sme_AddChAvoidCallback(pHddCtx->hHal,
-                           hdd_hostapd_ch_avoid_cb);
-#endif /* FEATURE_WLAN_CH_AVOID */
 
    //Register the traffic monitor timer now
    if ( pHddCtx->cfg_ini->dynSplitscan)
