@@ -65,7 +65,7 @@
 #include "vos_sched.h"
 #include "wlan_hdd_main.h"
 #include <net/cfg80211.h>
-
+#include <linux/firmware.h> /* IK8960KK-1546 & 546, vikasm, 05/03/2014 */
 #include <linux/of.h> /* IKJB42MAIN-9117, qjiang1, 04/10/2013 */
 
 static char crda_alpha2[2] = {0, 0}; /* country code from initial crda req */
@@ -569,7 +569,7 @@ VOS_STATUS vos_nv_open(void)
     v_SIZE_t bufSize;
     v_SIZE_t nvReadBufSize;
     v_BOOL_t itemIsValid = VOS_FALSE;
-    
+
     /*Get the global context */
     pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
     
@@ -2043,7 +2043,11 @@ VOS_STATUS vos_nv_write( VNV_TYPE type, v_VOID_t *inputVoidBuffer,
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_setValidity failed!!!\r\n"));
           status = VOS_STATUS_E_FAULT;
       }
-      status = wlan_write_to_efs((v_U8_t*)gnvEFSTable,sizeof(nvEFSTable_t),0);
+      /* IK8960KK-1546 & 546, vikasm, 05/03/2014 */
+      // buf size was mis-matched(larger than actual data size), causing panic during memcpy
+      // Solution: passing buf size which was read when gnvEFSTable being populated.
+      status = wlan_write_to_efs((v_U8_t*)gnvEFSTable, ((hdd_context_t *)(((VosContextType*)(pVosContext))->pHDDContext))->nv->size, 0);
+      /* IK8960KK-1546 & 546, vikasm, 05/03/2014 */
 
       if (! VOS_IS_STATUS_SUCCESS(status)) {
           VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR, ("vos_nv_write_to_efs failed!!!\r\n"));
