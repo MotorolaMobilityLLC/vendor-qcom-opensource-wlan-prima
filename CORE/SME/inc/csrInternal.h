@@ -645,7 +645,7 @@ typedef struct tagCsrConfig
     tANI_U8   txBFCsnValue;
 #endif
     tANI_U8   txLdpcEnable;
-
+    tANI_U8 isAmsduSupportInAMPDU;
 }tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo
