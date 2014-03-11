@@ -1764,6 +1764,11 @@ typedef enum
 #define CFG_TRAFFIC_IDLE_TIMEOUT_MAX              ( 10000 )
 #define CFG_TRAFFIC_IDLE_TIMEOUT_DEFAULT          ( 5000 )
 
+#define CFG_AMSDU_SUPPORT_IN_AMPDU_NAME                "gAmsduSupportInAMPDU"
+#define CFG_AMSDU_SUPPORT_IN_AMPDU_MIN                 (0)
+#define CFG_AMSDU_SUPPORT_IN_AMPDU_MAX                 (1)
+#define CFG_AMSDU_SUPPORT_IN_AMPDU_DEFAULT             (0) //disabled
+
 /*--------------------------------------------------------------------------- 
   Type declarations
   -------------------------------------------------------------------------*/ 
@@ -2138,6 +2143,7 @@ typedef struct
    v_U32_t                     cfgMaxMediumTime;
    v_U8_t                      enableTrafficMonitor;
    v_U32_t                     trafficIdleTimeout;
+   v_U8_t                      isAmsduSupportInAMPDU;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
