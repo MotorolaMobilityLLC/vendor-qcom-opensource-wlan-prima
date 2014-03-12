@@ -4395,9 +4395,10 @@ static int __iw_setint_getnone(struct net_device *dev,
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
     hdd_wext_state_t  *pWextState =  WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
-    int *value = (int *)extra;
-    int sub_cmd = value[0];
-    int set_value = value[1];
+    int cmd_len = wrqu->data.length;
+    int *value = (int *) kmalloc(cmd_len+1, GFP_KERNEL);
+    int sub_cmd;
+    int set_value;
     int ret = 0; /* success */
     int enable_pbm, enable_mp;
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -4411,6 +4412,18 @@ static int __iw_setint_getnone(struct net_device *dev,
                                   "%s:LOGP in Progress. Ignore!!!", __func__);
         return -EBUSY;
     }
+    if(value == NULL)
+       return -ENOMEM;
+
+    if(copy_from_user((char *) value, (char*)(wrqu->data.pointer), cmd_len)) {
+            hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user --data pointer failed! bailing",
+                 __FUNCTION__);
+         kfree(value);
+         return -EFAULT;
+     }
+     sub_cmd = value[0];
+     set_value = value[1];
+     kfree(value);
 
     switch(sub_cmd)
     {
