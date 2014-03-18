@@ -354,6 +354,7 @@ typedef enum eSirResultCodes
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
     eSIR_SME_GTK_OFFLOAD_GETINFO_REQ_FAILED,
 #endif // WLAN_FEATURE_GTK_OFFLOAD
+    eSIR_SME_DEAUTH_STATUS,
     eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE    
 } tSirResultCodes;
 
@@ -4568,7 +4569,7 @@ typedef struct
 typedef PACKED_PRE struct PACKED_POST
 {
     tANI_U8   bssid[6];     /* BSSID */
-    tANI_U8   ssid[32];     /* SSID */
+    tANI_U8   ssid[33];     /* SSID */
     tANI_U8   ch;           /* Channel */
     tANI_U8   rssi;         /* RSSI or Level */
     /*Timestamp when Network was found. Used to calculate age based on timestamp
