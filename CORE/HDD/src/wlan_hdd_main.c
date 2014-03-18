@@ -8030,8 +8030,7 @@ int hdd_wlan_startup(struct device *dev )
        hddLog(VOS_TRACE_LEVEL_ERROR,"%s: wiphy register failed", __func__);
        goto err_vosclose;
    }
-
-    status = wlan_hdd_init_channels(pHddCtx);
+   status = wlan_hdd_init_channels(pHddCtx);
    if ( !VOS_IS_STATUS_SUCCESS( status ) )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: wlan_hdd_init_channels failed",
