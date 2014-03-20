@@ -108,6 +108,8 @@ typedef enum {
 #ifdef FEATURE_WLAN_BATCH_SCAN
    BATCH_SCAN = 30,
 #endif
+   EXTENDED_NSOFFLOAD_SLOT = 32,
+   UPDATE_CHANNEL_LIST = 35,
 
    //MAX_FEATURE_SUPPORTED = 128
 } placeHolderInCapBitmap;
@@ -618,7 +620,7 @@ typedef struct sSirMbMsgP2p
 #define SIR_HAL_SET_MAX_TX_POWER_PER_BAND_RSP \
         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 215)
 
-#define SIR_HAL_MSG_TYPES_END              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 0xFF)
+#define SIR_HAL_MSG_TYPES_END              (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 // CFG message types
 #define SIR_CFG_MSG_TYPES_BEGIN        (SIR_CFG_MODULE_ID << 8)
 #define SIR_CFG_ITC_MSG_TYPES_BEGIN    (SIR_CFG_MSG_TYPES_BEGIN+0xB0)

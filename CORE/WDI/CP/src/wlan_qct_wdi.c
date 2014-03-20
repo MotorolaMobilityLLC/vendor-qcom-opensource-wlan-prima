@@ -402,6 +402,8 @@ WDI_ReqProcFuncType  pfnReqProcTbl[WDI_MAX_UMAC_IND] =
 #endif /* FEATURE_WLAN_BATCH_SCAN */
 
   WDI_ProcessSetMaxTxPowerPerBandReq,   /* WDI_SET_MAX_TX_POWER_PER_BAND_REQ*/
+
+  WDI_ProcessUpdateChannelParamsReq,    /* WDI_UPDATE_CHAN_REQ */
   /*-------------------------------------------------------------------------
     Indications
   -------------------------------------------------------------------------*/
@@ -613,6 +615,8 @@ WDI_RspProcFuncType  pfnRspProcTbl[WDI_MAX_RESP] =
     NULL,
 #endif /*FEATURE_WLAN_BATCH_SCAN*/
   WDI_ProcessSetMaxTxPowerPerBandRsp,  /* WDI_SET_MAX_TX_POWER_PER_BAND_RSP */
+
+    WDI_ProcessUpdateChanRsp,         /* WDI_UPDATE_CHAN_RESP */
 
   /*---------------------------------------------------------------------
     Indications
@@ -988,6 +992,7 @@ static char *WDI_getReqMsgString(wpt_uint16 wdiReqMsgId)
     CASE_RETURN_STRING( WDI_STOP_BATCH_SCAN_IND );
     CASE_RETURN_STRING( WDI_TRIGGER_BATCH_SCAN_RESULT_IND);
 #endif
+    CASE_RETURN_STRING(WDI_UPDATE_CHAN_REQ);
     default:
         return "Unknown WDI MessageId";
   }
@@ -1094,6 +1099,7 @@ static char *WDI_getRespMsgString(wpt_uint16 wdiRespMsgId)
 #ifdef FEATURE_WLAN_BATCH_SCAN
     CASE_RETURN_STRING( WDI_SET_BATCH_SCAN_RESP);
 #endif
+    CASE_RETURN_STRING( WDI_UPDATE_CHAN_RESP);
     default:
         return "Unknown WDI MessageId";
   }
@@ -1185,6 +1191,12 @@ void WDI_TraceHostFWCapabilities(tANI_U32 *capabilityBitmap)
                      case WLAN_ROAM_SCAN_OFFLOAD: snprintf(pCapStr, sizeof("WLAN_ROAM_SCAN_OFFLOAD"), "%s", "WLAN_ROAM_SCAN_OFFLOAD");
                           pCapStr += strlen("WLAN_ROAM_SCAN_OFFLOAD");
                           break;
+                     case EXTENDED_NSOFFLOAD_SLOT: snprintf(pCapStr,
+                                              sizeof("EXTENDED_NSOFFLOAD_SLOT"),
+                                              "%s", "EXTENDED_NSOFFLOAD_SLOT");
+                          pCapStr += strlen("EXTENDED_NSOFFLOAD_SLOT");
+                          break;
+
                  }
                  *pCapStr++ = ',';
                  *pCapStr++ = ' ';
@@ -4880,6 +4892,62 @@ WDI_ConfigSTAReq
   return WDI_PostMainEvent(&gWDICb, WDI_REQUEST_EVENT, &wdiEventData);
 
 }/*WDI_ConfigSTAReq*/
+
+ /**
+ @brief WDI_UpdateChannelReq will be called when the upper MAC
+        wants to update the channel list on change in country code.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+ WDI_UpdateChannelReq must have been called.
+
+ @param wdiUpdateChannelReqParams: the updated channel parameters
+                      as specified by the Device Interface
+
+        wdiUpdateChannelRspCb: callback for passing back the
+        response of the update channel operation received from
+        the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+WDI_Status
+WDI_UpdateChannelReq
+(
+  WDI_UpdateChReqParamsType *pwdiUpdateChannelReqParams,
+  WDI_UpdateChannelRspCb     wdiUpdateChannelRspCb,
+  void*                     pUserData
+)
+{
+  WDI_EventInfoType      wdiEventData = {{0}};
+  /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+  /*------------------------------------------------------------------------
+    Sanity Check
+  ------------------------------------------------------------------------*/
+  if ( eWLAN_PAL_FALSE == gWDIInitialized )
+  {
+    WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
+              "WDI API call before module is initialized - Fail request");
+
+    return WDI_STATUS_E_NOT_ALLOWED;
+  }
+
+  /*------------------------------------------------------------------------
+    Fill in Event data and post to the Main FSM
+  ------------------------------------------------------------------------*/
+  wdiEventData.wdiRequest      = WDI_UPDATE_CHAN_REQ;
+  wdiEventData.pEventData      = pwdiUpdateChannelReqParams;
+  wdiEventData.uEventDataSize  = sizeof(*pwdiUpdateChannelReqParams);
+  wdiEventData.pCBfnc          = wdiUpdateChannelRspCb;
+  wdiEventData.pUserData       = pUserData;
+
+  return WDI_PostMainEvent(&gWDICb, WDI_REQUEST_EVENT, &wdiEventData);
+
+}/*WDI_UpdateChannelReq*/
 
 /**
  @brief WDI_SetLinkStateReq will be called when the upper MAC
@@ -21460,12 +21528,11 @@ WDI_ResponseTimerCB
        return;
     }
 #ifndef WDI_RE_ENABLE_WIFI_ON_WDI_TIMEOUT
-   if(wpalIsWDresetInProgress())
-   {
-       wpalDevicePanic();
-   }
-
     wpalWcnssResetIntr();
+    if(wpalIsWDresetInProgress())
+    {
+        wpalDevicePanic();
+    }
     /* if this timer fires, it means Riva did not receive the FIQ */
     wpalTimerStart(&pWDICtx->ssrTimer, WDI_SSR_TIMEOUT);
 #else
@@ -22889,6 +22956,8 @@ WDI_2_HAL_REQ_TYPE
     return WLAN_HAL_ADD_PERIODIC_TX_PTRN_IND;
   case WDI_DEL_PERIODIC_TX_PATTERN_IND:
     return WLAN_HAL_DEL_PERIODIC_TX_PTRN_IND;
+  case WDI_UPDATE_CHAN_REQ:
+    return WLAN_HAL_UPDATE_CHANNEL_LIST_REQ;
 
 #ifdef FEATURE_WLAN_BATCH_SCAN
   case WDI_SET_BATCH_SCAN_REQ:
@@ -23160,6 +23229,9 @@ case WLAN_HAL_DEL_STA_SELF_RSP:
   case WLAN_HAL_AVOID_FREQ_RANGE_IND:
     return WDI_HAL_CH_AVOID_IND;
 #endif /* FEATURE_WLAN_CH_AVOID */
+
+  case WLAN_HAL_UPDATE_CHANNEL_LIST_RSP:
+    return WDI_UPDATE_CHAN_RESP;
 
   default:
     return eDRIVER_TYPE_MAX;
@@ -24252,6 +24324,18 @@ WDI_SetPreferredNetworkReq
    {
      WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
                "WDI API call before module is initialized - Fail request");
+
+     return WDI_STATUS_E_NOT_ALLOWED;
+   }
+
+   /*----------------------------------------------------------------------
+     Avoid Enable PNO during any active session or an ongoing session
+   ----------------------------------------------------------------------*/
+   if ( (pwdiPNOScanReqParams->wdiPNOScanInfo.bEnable &&
+        WDI_GetActiveSessionsCount(&gWDICb, NULL, eWLAN_PAL_FALSE)) )
+   {
+     WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "%s:(Active/Ongoing Session) - Fail request", __func__);
 
      return WDI_STATUS_E_NOT_ALLOWED;
    }
@@ -25373,6 +25457,80 @@ WDI_ProcessUpdateScanParamsReq
    return  WDI_SendMsg( pWDICtx, pSendBuffer, usSendSize,
                         wdiUpdateScanParamsCb, pEventData->pUserData, 
                         WDI_UPDATE_SCAN_PARAMS_RESP);
+}
+
+/**
+ @brief Process Update Channel Params function
+
+ @param  pWDICtx:         pointer to the WLAN DAL context
+         pEventData:      pointer to the event information structure
+
+ @see
+ @return Result of the function call
+*/
+WDI_Status
+WDI_ProcessUpdateChannelParamsReq
+(
+  WDI_ControlBlockType*  pWDICtx,
+  WDI_EventInfoType*     pEventData
+)
+{
+   WDI_UpdateChReqParamsType     *pwdiUpdateChanListParams  = NULL;
+   WDI_UpdateChannelRspCb        wdiUpdateChanParamsCb = NULL;
+   wpt_uint8*                    pSendBuffer           = NULL;
+   wpt_uint16                    usDataOffset          = 0;
+   wpt_uint16                    usSendSize            = 0;
+   tUpdateChannelReqType         *updateChannelParams;
+   wpt_uint32                    usUpdateChanParamSize;
+   wpt_uint8                     num_channels = 0;
+
+   /*-------------------------------------------------------------------------
+     Sanity check
+   -------------------------------------------------------------------------*/
+   if (( NULL == pEventData ) ||
+       ( NULL == (pwdiUpdateChanListParams = (WDI_UpdateChReqParamsType*)pEventData->pEventData)) ||
+       ( NULL == (wdiUpdateChanParamsCb = (WDI_UpdateChannelRspCb)pEventData->pCBfnc)))
+   {
+      WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
+                  "%s: Invalid parameters", __func__);
+      WDI_ASSERT(0);
+      return WDI_STATUS_E_FAILURE;
+   }
+   num_channels = pwdiUpdateChanListParams->wdiUpdateChanParams.numchan;
+   usUpdateChanParamSize =  (sizeof(tUpdateChannelReqType) -
+           ((WLAN_HAL_ROAM_SCAN_MAX_CHANNELS - num_channels) *
+           sizeof(tUpdateChannelParam)));
+
+   /*-----------------------------------------------------------------------
+     Get message buffer
+   -----------------------------------------------------------------------*/
+   if (( WDI_STATUS_SUCCESS != WDI_GetMessageBuffer( pWDICtx,
+                   WDI_UPDATE_CHAN_REQ, usUpdateChanParamSize,
+                   &pSendBuffer, &usDataOffset, &usSendSize))||
+       ( usSendSize < (usDataOffset + usUpdateChanParamSize)))
+   {
+      WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
+                  "Unable to get send buffer in Update Channel Params req %p",
+                   pwdiUpdateChanListParams);
+      WDI_ASSERT(0);
+      return WDI_STATUS_E_FAILURE;
+   }
+   updateChannelParams = (tUpdateChannelReqType *)(pSendBuffer + usDataOffset);
+
+   updateChannelParams->numChan = num_channels;
+   wpalMemoryCopy(&updateChannelParams->chanParam,
+           pwdiUpdateChanListParams->wdiUpdateChanParams.pchanParam,
+           sizeof(WDI_UpdateChannelReqinfoType) * num_channels);
+
+   pWDICtx->wdiReqStatusCB     = pwdiUpdateChanListParams->wdiReqStatusCB;
+   pWDICtx->pReqStatusUserData = pwdiUpdateChanListParams->pUserData;
+
+   /*-------------------------------------------------------------------------
+     Send Update channel request to fw
+   -------------------------------------------------------------------------*/
+   return  WDI_SendMsg(pWDICtx, pSendBuffer, usSendSize,
+                        wdiUpdateChanParamsCb, pEventData->pUserData,
+                        WDI_UPDATE_CHAN_RESP);
 }
 
 /**
@@ -29069,6 +29227,53 @@ WDI_Status WDI_TriggerBatchScanResultInd
 }
 
 #endif /*FEATURE_WLAN_BATCH_SCAN*/
+
+/**
+ @brief Process Update Channel Rsp function (called when a response is
+        being received over the bus from HAL)
+
+ @param  pWDICtx:         pointer to the WLAN DAL context
+         pEventData:      pointer to the event information structure
+
+ @see
+ @return Result of the function call
+*/
+WDI_Status
+WDI_ProcessUpdateChanRsp
+(
+  WDI_ControlBlockType*  pWDICtx,
+  WDI_EventInfoType*     pEventData
+)
+{
+  WDI_Status           wdiStatus;
+  eHalStatus           halStatus;
+  WDI_UpdateChannelRspCb   wdiUpdateChanRspCb;
+  /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+  /*-------------------------------------------------------------------------
+    Sanity check
+  -------------------------------------------------------------------------*/
+  if (( NULL == pWDICtx ) || ( NULL == pEventData ) ||
+      ( NULL == pEventData->pEventData))
+  {
+     WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_WARN,
+                 "%s: Invalid parameters", __func__);
+     WDI_ASSERT(0);
+     return WDI_STATUS_E_FAILURE;
+  }
+
+  wdiUpdateChanRspCb = (WDI_UpdateChannelRspCb)pWDICtx->pfncRspCB;
+
+  /*-------------------------------------------------------------------------
+    Extract response and send it to UMAC
+  -------------------------------------------------------------------------*/
+  halStatus = *((eHalStatus*)pEventData->pEventData);
+  wdiStatus   =   WDI_HAL_2_WDI_STATUS(halStatus);
+
+  wdiUpdateChanRspCb( wdiStatus, pWDICtx->pRspCBUserData);
+
+  return WDI_STATUS_SUCCESS;
+}/*WDI_ProcessUpdateChanRsp*/
 
 #ifdef FEATURE_WLAN_CH_AVOID
 /**
