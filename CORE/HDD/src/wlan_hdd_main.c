@@ -5567,6 +5567,14 @@ int hdd_wlan_startup(struct device *dev )
              "%s: Setting pHddCtx->cfg_ini->nthBeaconFilter = 1", __func__);
       pHddCtx->cfg_ini->nthBeaconFilter = 1;
    }
+
+   status = vos_open( &pVosContext, 0);
+   if ( !VOS_IS_STATUS_SUCCESS( status ))
+   {
+      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_open failed", __func__);
+      goto err_clkvote;
+   }
+
    /*
     * cfg80211: Initialization and registration ...
     */
@@ -5643,13 +5651,6 @@ int hdd_wlan_startup(struct device *dev )
    {
       hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Failed to configure 19.2 MHz Clock", __func__);
       goto err_wdclose;
-   }
-
-   status = vos_open( &pVosContext, 0);
-   if ( !VOS_IS_STATUS_SUCCESS( status ))
-   {
-      hddLog(VOS_TRACE_LEVEL_FATAL, "%s: vos_open failed", __func__);
-      goto err_clkvote;
    }
 
    pHddCtx->hHal = (tHalHandle)vos_get_context( VOS_MODULE_ID_SME, pVosContext );
