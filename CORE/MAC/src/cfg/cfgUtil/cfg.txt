@@ -4670,3 +4670,15 @@ HAL
 0    250000    90000
 *
 *
+
+* GO Link Monitor Timeout (TU)
+*
+WNI_CFG_GO_LINK_MONITOR_TIMEOUT I 4 7
+V    RW    NP
+HAL
+3    50    10
+V    RW    NP
+HAL
+3    50    10
+*
+*
