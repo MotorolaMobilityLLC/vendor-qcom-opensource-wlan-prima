@@ -88,6 +88,7 @@ typedef struct sCsrNeighborRoamCfgParams
     tCsrCountryChannelInfo countryChannelInfo;
 #endif
     tANI_U16        emptyScanRefreshPeriod;
+    tANI_U32        emptyScanMaxPeriod;
 } tCsrNeighborRoamCfgParams, *tpCsrNeighborRoamCfgParams;
 
 #define CSR_NEIGHBOR_ROAM_INVALID_CHANNEL_INDEX    255
@@ -210,6 +211,8 @@ typedef struct sCsrNeighborRoamControlInfo
                                                     we re-initialize occupied channel list */
     tANI_S8                     lookupDOWNRssi;
     tANI_U8                     uScanMode;
+    tANI_U8                     uEmptyScanRefreshTimerCount;
+    tANI_U32                    emptyScanTotalTime;
 #endif
 } tCsrNeighborRoamControlInfo, *tpCsrNeighborRoamControlInfo;
 

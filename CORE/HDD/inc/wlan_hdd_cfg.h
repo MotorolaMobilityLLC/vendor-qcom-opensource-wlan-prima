@@ -1184,6 +1184,12 @@ typedef enum
 #define CFG_EMPTY_SCAN_REFRESH_PERIOD_MIN          (1000)
 #define CFG_EMPTY_SCAN_REFRESH_PERIOD_MAX          (60000)
 #define CFG_EMPTY_SCAN_REFRESH_PERIOD_DEFAULT      (0)
+#define CFG_EMPTY_SCAN_MAX_PERIOD_NAME         "gEmptyScanMaxPeriod"
+#define CFG_EMPTY_SCAN_MAX_PERIOD_MIN          (60000)
+#define CFG_EMPTY_SCAN_MAX_PERIOD_MAX          (1200000)
+#define CFG_EMPTY_SCAN_MAX_PERIOD_DEFAULT      (600000)
+
+
 #endif /* WLAN_FEATURE_NEIGHBOR_ROAMING */
 
 #define CFG_QOS_WMM_BURST_SIZE_DEFN_NAME                        "burstSizeDefinition" 
@@ -1902,6 +1908,7 @@ typedef struct
    v_U16_t       nMaxNeighborReqTries;
    v_U16_t       nNeighborResultsRefreshPeriod;
    v_U16_t       nEmptyScanRefreshPeriod;
+   v_U32_t       nEmptyScanMaxPeriod;
 #endif
 
    //Handoff Parameters
