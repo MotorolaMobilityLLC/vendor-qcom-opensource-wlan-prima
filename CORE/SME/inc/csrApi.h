@@ -945,6 +945,7 @@ typedef struct tagCsrNeighborRoamConfigParams
     tANI_U8        nMaxNeighborRetries;
     tANI_U16       nNeighborResultsRefreshPeriod;
     tANI_U16       nEmptyScanRefreshPeriod;
+    tANI_U32       nEmptyScanMaxPeriod;
 }tCsrNeighborRoamConfigParams;
 #endif
 
