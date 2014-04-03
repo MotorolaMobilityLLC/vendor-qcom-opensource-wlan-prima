@@ -6308,16 +6308,19 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter)
     tHddBatchScanRsp *pNode;
     tHddBatchScanRsp *pPrev;
 
-    if (pAdapter)
+    if (NULL == pAdapter)
     {
-        pNode = pAdapter->pBatchScanRsp;
-        while (pNode)
-        {
-            pPrev = pNode;
-            pNode = pNode->pNext;
-            vos_mem_free((v_VOID_t * )pPrev);
-        }
-        pAdapter->pBatchScanRsp = NULL;
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+                "%s: Adapter context is Null", __func__);
+        return;
+    }
+
+    pNode = pAdapter->pBatchScanRsp;
+    while (pNode)
+    {
+        pPrev = pNode;
+        pNode = pNode->pNext;
+        vos_mem_free((v_VOID_t * )pPrev);
     }
 
     pAdapter->pBatchScanRsp = NULL;
@@ -8442,14 +8445,13 @@ err_vosclose:
    }
    vos_close(pVosContext );
 
-#ifdef CONFIG_ENABLE_LINUX_REG
 err_vos_nv_close:
 
+#ifdef CONFIG_ENABLE_LINUX_REG
    vos_nv_close();
 
 err_clkvote:
 #endif
-
    vos_chipVoteOffXOBuffer(NULL, NULL, NULL);
 
 err_wdclose:
