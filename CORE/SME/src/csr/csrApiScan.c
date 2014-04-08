@@ -7319,17 +7319,21 @@ void csrSetCfgValidChannelList( tpAniSirGlobal pMac, tANI_U8 *pChannelList, tANI
     eHalStatus status;
 
     ccmCfgSetStr(pMac, WNI_CFG_VALID_CHANNEL_LIST, pChannelList, dataLen, NULL, eANI_BOOLEAN_FALSE);
-
+#ifdef QCA_WIFI_2_0
     if (pMac->fScanOffload)
     {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                 "Scan offload is enabled, update default chan list");
-        status = csrUpdateChannelList(&pMac->scan);
-        if (eHAL_STATUS_SUCCESS != status)
-        {
-            VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-                    "failed to update the supported channel list");
-        }
+        status = csrUpdateChannelList(pMac);
+    }
+#else
+    status = csrUpdateChannelList(pMac);
+#endif
+
+    if (eHAL_STATUS_SUCCESS != status)
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                "failed to update the supported channel list");
     }
     return;
 }
@@ -7862,6 +7866,13 @@ eHalStatus csrScanSavePreferredNetworkFound(tpAniSirGlobal pMac,
    pBssDescr->sinr = 0;
    pBssDescr->rssi = -1 * pPrefNetworkFoundInd->rssi;
    pBssDescr->beaconInterval = pParsedFrame->beaconInterval;
+ if (!pBssDescr->beaconInterval)
+   {
+      smsLog(pMac, LOGW,
+         FL("Bcn Interval is Zero , default to 100" MAC_ADDRESS_STR),
+         MAC_ADDR_ARRAY(pBssDescr->bssId) );
+      pBssDescr->beaconInterval = 100;
+   }
    pBssDescr->timeStamp[0]   = pParsedFrame->timeStamp[0];
    pBssDescr->timeStamp[1]   = pParsedFrame->timeStamp[1];
    pBssDescr->capabilityInfo = *((tANI_U16 *)&pParsedFrame->capabilityInfo);

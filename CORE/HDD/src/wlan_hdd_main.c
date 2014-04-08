@@ -253,9 +253,6 @@ static int hdd_netdev_notifier_call(struct notifier_block * nb,
       (strncmp(dev->name, "p2p", 3)))
       return NOTIFY_DONE;
 
-   if (isWDresetInProgress())
-      return NOTIFY_DONE;
-
    if (!dev->ieee80211_ptr)
       return NOTIFY_DONE;
 
@@ -273,6 +270,9 @@ static int hdd_netdev_notifier_call(struct notifier_block * nb,
       VOS_ASSERT(0);
       return NOTIFY_DONE;
    }
+   if (pHddCtx->isLogpInProgress)
+      return NOTIFY_DONE;
+
 
    hddLog(VOS_TRACE_LEVEL_INFO, "%s: %s New Net Device State = %lu",
           __func__, dev->name, state);
@@ -924,11 +924,11 @@ hdd_parse_set_batchscan_command
 
         if (('A' == val) || ('a' == val))
         {
-            ucRfBand = HDD_SET_BATCH_SCAN_24GHz_BAND_ONLY;
+            ucRfBand = HDD_SET_BATCH_SCAN_5GHz_BAND_ONLY;
         }
         else if (('B' == val) || ('b' == val))
         {
-            ucRfBand = HDD_SET_BATCH_SCAN_5GHz_BAND_ONLY;
+            ucRfBand = HDD_SET_BATCH_SCAN_24GHz_BAND_ONLY;
         }
         else
         {
@@ -1656,6 +1656,16 @@ int hdd_handle_batch_scan_ioctl
 )
 {
     int ret = 0;
+    hdd_context_t *pHddCtx;
+
+    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+    ret = wlan_hdd_validate_context(pHddCtx);
+    if (ret)
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: HDD context is not valid!", __func__);
+        goto exit;
+    }
 
     if (strncmp(command, "WLS_BATCHING VERSION", 20) == 0)
     {
@@ -5214,6 +5224,7 @@ static hdd_adapter_t* hdd_alloc_station_adapter( hdd_context_t *pHddCtx, tSirMac
       init_completion(&pAdapter->linkup_event_var);
       init_completion(&pAdapter->cancel_rem_on_chan_var);
       init_completion(&pAdapter->rem_on_chan_ready_event);
+      init_completion(&pAdapter->pno_comp_var);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
       init_completion(&pAdapter->offchannel_tx_event);
 #endif
@@ -7837,6 +7848,7 @@ int hdd_wlan_startup(struct device *dev )
    init_completion(&pHddCtx->scan_info.scan_req_completion_event);
    init_completion(&pHddCtx->scan_info.abortscan_event_var);
    init_completion(&pHddCtx->wiphy_channel_update_event);
+   init_completion(&pHddCtx->ssr_comp_var);
 
 #ifdef CONFIG_ENABLE_LINUX_REG
    init_completion(&pHddCtx->linux_reg_req);
@@ -8716,7 +8728,7 @@ static void hdd_driver_exit(void)
 {
    hdd_context_t *pHddCtx = NULL;
    v_CONTEXT_t pVosContext = NULL;
-   int retry = 0;
+   unsigned long rc = 0;
 
    pr_info("%s: unloading driver v%s\n", WLAN_MODULE_NAME, QWLAN_VERSIONSTR);
 
@@ -8738,18 +8750,21 @@ static void hdd_driver_exit(void)
    }
    else
    {
-      while(isWDresetInProgress()) {
+       INIT_COMPLETION(pHddCtx->ssr_comp_var);
+
+       if (pHddCtx->isLogpInProgress)
+       {
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-              "%s:SSR in Progress; block rmmod for 1 second!!!", __func__);
-         msleep(1000);
-
-         if (retry++ == HDD_MOD_EXIT_SSR_MAX_RETRIES) {
-            VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
-              "%s:SSR never completed, fatal error", __func__);
-            VOS_BUG(0);
+              "%s:SSR in Progress; block rmmod !!!", __func__);
+         rc = wait_for_completion_timeout(&pHddCtx->ssr_comp_var,
+                                          msecs_to_jiffies(30000));
+         if(!rc)
+         {
+              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL,
+              "%s:SSR timedout, fatal error", __func__);
+              VOS_BUG(0);
          }
-      }
-
+       }
 
       pHddCtx->isLoadUnloadInProgress = TRUE;
       vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);

@@ -507,10 +507,13 @@ void dxeChannelAllDescDump
 ===========================================================================*/
 void dxeErrChannelDebug
 (
-    WLANDXE_ChannelCBType    *channelCb
+    WLANDXE_ChannelCBType    *channelCb,
+    wpt_uint32                chStatusReg
 )
 {
    wpt_log_data_stall_channel_type channelLog;
+   wpt_uint32 chLDescReg, channelLoop;
+   WLANDXE_DescCtrlBlkType *targetCtrlBlk;
 
    dxeChannelMonitor("INT_ERR", channelCb, &channelLog);
    dxeDescriptorDump(channelCb, channelCb->headCtrlBlk->linkedDesc, 0);
@@ -523,7 +526,67 @@ void dxeErrChannelDebug
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
    wpalPacketStallDumpLog();
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
+   switch ((chStatusReg & WLANDXE_CH_STAT_ERR_CODE_MASK) >>
+            WLANDXE_CH_STAT_ERR_CODE_OFFSET)
+   {
 
+      case WLANDXE_ERROR_PRG_INV_B2H_SRC_QID:
+      case WLANDXE_ERROR_PRG_INV_B2H_DST_QID:
+      case WLANDXE_ERROR_PRG_INV_B2H_SRC_IDX:
+      case WLANDXE_ERROR_PRG_INV_H2B_SRC_QID:
+      case WLANDXE_ERROR_PRG_INV_H2B_DST_QID:
+      case WLANDXE_ERROR_PRG_INV_H2B_DST_IDX:
+      {
+         dxeNotifySmsm(eWLAN_PAL_FALSE, eWLAN_PAL_TRUE);
+         dxeNotifySmsm(eWLAN_PAL_TRUE, eWLAN_PAL_FALSE);
+         wpalSleep(10);
+
+         if(channelCb->channelType > WDTS_CHANNEL_RX_HIGH_PRI)
+         {
+            HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+                     "%s: Invalid Channel", __func__);
+            break;
+         }
+
+         wpalReadRegister(channelCb->channelRegister.chDXELstDesclRegAddr, &chLDescReg);
+
+         targetCtrlBlk = channelCb->headCtrlBlk;
+
+         for(channelLoop = 0; channelLoop < channelCb->numDesc; channelLoop++)
+         {
+            if (targetCtrlBlk->linkedDescPhyAddr == chLDescReg)
+            {
+                HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+                         "%11s :CHx_DESCL: desc ctrl 0x%x, src 0x%x, dst 0x%x, next 0x%x",
+                         channelType[channelCb->channelType],
+                         targetCtrlBlk->linkedDesc->descCtrl.ctrl,
+                         targetCtrlBlk->linkedDesc->dxedesc.dxe_short_desc.srcMemAddrL,
+                         targetCtrlBlk->linkedDesc->dxedesc.dxe_short_desc.dstMemAddrL,
+                         targetCtrlBlk->linkedDesc->dxedesc.dxe_short_desc.phyNextL);
+
+                targetCtrlBlk = (WLANDXE_DescCtrlBlkType *)targetCtrlBlk->nextCtrlBlk;
+
+                HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+                         "%11s :Next Desc: desc ctrl 0x%x, src 0x%x, dst 0x%x, next 0x%x",
+                         channelType[channelCb->channelType],
+                         targetCtrlBlk->linkedDesc->descCtrl.ctrl,
+                         targetCtrlBlk->linkedDesc->dxedesc.dxe_short_desc.srcMemAddrL,
+                         targetCtrlBlk->linkedDesc->dxedesc.dxe_short_desc.dstMemAddrL,
+                         targetCtrlBlk->linkedDesc->dxedesc.dxe_short_desc.phyNextL);
+                break;
+            }
+            targetCtrlBlk = (WLANDXE_DescCtrlBlkType *)targetCtrlBlk->nextCtrlBlk;
+         }
+         break;
+      }
+      default:
+      {
+         HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_FATAL,
+                  "%s: No Debug Inormation", __func__);
+         break;
+      }
+
+   }
    wpalFwDumpReq(17, 0, 0, 0, 0);
 }
 /*==========================================================================
@@ -2833,7 +2896,7 @@ void dxeRXEventHandler
                   "%11s : 0x%x Error Reported, Reload Driver",
                   channelType[channelCb->channelType], chHighStat);
 
-         dxeErrChannelDebug(channelCb);
+         dxeErrChannelDebug(channelCb, chHighStat);
 
          dxeCtxt->driverReloadInProcessing = eWLAN_PAL_TRUE;
          wpalWlanReload();
@@ -2886,7 +2949,7 @@ void dxeRXEventHandler
                   "%11s : 0x%x Error Reported, Reload Driver",
                   channelType[channelCb->channelType], chStat);
 
-         dxeErrChannelDebug(channelCb);
+         dxeErrChannelDebug(channelCb, chStat);
 
          dxeCtxt->driverReloadInProcessing = eWLAN_PAL_TRUE;
          wpalWlanReload();
@@ -2934,7 +2997,7 @@ void dxeRXEventHandler
                   "%11s : 0x%x Error Reported, Reload Driver",
                   channelType[channelCb->channelType], chLowStat);
 
-         dxeErrChannelDebug(channelCb);
+         dxeErrChannelDebug(channelCb, chLowStat);
 
          dxeCtxt->driverReloadInProcessing = eWLAN_PAL_TRUE;
          wpalWlanReload();
@@ -3867,7 +3930,7 @@ void dxeTXEventHandler
                   "%11s : 0x%x Error Reported, Reload Driver",
                   channelType[channelCb->channelType], chStat);
 
-         dxeErrChannelDebug(channelCb);
+         dxeErrChannelDebug(channelCb, chStat);
 
          dxeCtxt->driverReloadInProcessing = eWLAN_PAL_TRUE;
          wpalWlanReload();
@@ -3921,7 +3984,7 @@ void dxeTXEventHandler
                   "%11s : 0x%x Error Reported, Reload Driver",
                   channelType[channelCb->channelType], chStat);
 
-         dxeErrChannelDebug(channelCb);
+         dxeErrChannelDebug(channelCb, chStat);
 
          dxeCtxt->driverReloadInProcessing = eWLAN_PAL_TRUE;
          wpalWlanReload();
@@ -3977,7 +4040,7 @@ void dxeTXEventHandler
                   "%11s : 0x%x Error Reported, Reload Driver",
                   channelType[channelCb->channelType], chStat);
 
-         dxeErrChannelDebug(channelCb);
+         dxeErrChannelDebug(channelCb, chStat);
 
          dxeCtxt->driverReloadInProcessing = eWLAN_PAL_TRUE;
          wpalWlanReload();
@@ -4255,6 +4318,39 @@ void dxeTXReSyncDesc
    return;
 }
 
+/*==========================================================================
+  @  Function Name
+      dxeDebugTxDescReSync
+
+  @  Description
+       Check DXE Tx channel state and correct it in
+       case Tx Data stall is detected by calling
+       %dxeTXReSyncDesc. Also ensure that WCN SS
+       is not power collapsed before calling
+       %dxeTXReSyncDesc
+
+  @  Parameters
+      void    *msgPtr
+               Message pointer to sync with TX thread
+
+  @  Return
+      NONE
+===========================================================================*/
+void dxeDebugTxDescReSync
+(
+   wpt_msg                  *msgPtr
+)
+{
+   HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "%s: Check for DXE TX Async",__func__);
+   /* Make wake up HW */
+   dxeNotifySmsm(eWLAN_PAL_FALSE, eWLAN_PAL_TRUE);
+   dxeNotifySmsm(eWLAN_PAL_TRUE, eWLAN_PAL_FALSE);
+
+   wpalSleep(10);
+
+   dxeTXReSyncDesc(msgPtr);
+}
 /*==========================================================================
   @  Function Name 
       dxeTXISR
@@ -5575,9 +5671,10 @@ wpt_uint32 WLANDXE_GetFreeTxDataResNumber
 
   @  Parameters
     displaySnapshot : Display DXE snapshot option
-    enableStallDetect : Enable stall detect feature
-                        This feature will take effect to data performance
-                        Not integrate till fully verification
+    debugFlags      : Enable stall detect features
+                      defined by WPAL_DeviceDebugFlags
+                      These features may effect
+                      data performance.
 
   @  Return
     NONE
@@ -5585,11 +5682,12 @@ wpt_uint32 WLANDXE_GetFreeTxDataResNumber
 ===========================================================================*/
 void WLANDXE_ChannelDebug
 (
-   wpt_boolean    displaySnapshot,
-   wpt_boolean    enableStallDetect   
+   wpt_boolean displaySnapshot,
+   wpt_uint8   debugFlags
 )
 {
    wpt_msg                  *channelDebugMsg;
+   wpt_msg                  *txDescReSyncMsg ;
    wpt_uint32                regValue;
    wpt_status                status = eWLAN_PAL_STATUS_SUCCESS;
 
@@ -5632,12 +5730,32 @@ void WLANDXE_ChannelDebug
       }
    }
 
-   /* Debug Type 2, toggling stall detect enable/disable */
-   if(enableStallDetect)
+   if(debugFlags & WPAL_DEBUG_TX_DESC_RESYNC)
    {
-      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_WARN,
-               "DXE TX Stall detect",
-               0, 0, 0);
+      txDescReSyncMsg = (wpt_msg *)wpalMemoryAllocate(sizeof(wpt_msg));
+      if(NULL == txDescReSyncMsg)
+      {
+         HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                  "%s: Resync MSG MEM alloc Fail",__func__);
+      }
+      else
+      {
+         txDescReSyncMsg->callback = dxeDebugTxDescReSync;
+         txDescReSyncMsg->pContext = tempDxeCtrlBlk;
+         status = wpalPostTxMsg(WDI_GET_PAL_CTX(),
+                                txDescReSyncMsg);
+         if(eWLAN_PAL_STATUS_SUCCESS != status)
+         {
+            HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+                     "%s: Post TX re-sync MSG fail",__func__);
+         }
+      }
+   }
+
+   if(debugFlags & WPAL_DEBUG_START_HEALTH_TIMER)
+   {
+      HDXE_MSG(eWLAN_MODULE_DAL_DATA, eWLAN_PAL_TRACE_LEVEL_ERROR,
+               "DXE TX Stall detect");
       /* Start Stall detect timer and detect stall */
       wpalTimerStart(&tempDxeCtrlBlk->dxeChannel[WDTS_CHANNEL_TX_LOW_PRI].healthMonitorTimer,
                      T_WLANDXE_PERIODIC_HEALTH_M_TIME);
