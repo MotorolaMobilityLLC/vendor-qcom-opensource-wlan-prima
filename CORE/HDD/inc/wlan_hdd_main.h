@@ -1296,6 +1296,7 @@ struct hdd_context_s
 #endif /* FEATURE_WLAN_CH_AVOID */
 
    v_BOOL_t btCoexModeSet;
+   v_BOOL_t isPnoEnable;
 };
 
 
