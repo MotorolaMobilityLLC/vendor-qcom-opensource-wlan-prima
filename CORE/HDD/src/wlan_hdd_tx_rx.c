@@ -763,12 +763,40 @@ VOS_STATUS hdd_Ibss_GetStaId(hdd_station_ctx_t *pHddStaCtx, v_MACADDR_t *pMacAdd
   ===========================================================================*/
 void hdd_tx_timeout(struct net_device *dev)
 {
+   hdd_adapter_t *pAdapter =  WLAN_HDD_GET_PRIV_PTR(dev);
+   struct netdev_queue *txq;
+   int i = 0;
+
    VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
       "%s: Transmission timeout occurred", __func__);
    //Getting here implies we disabled the TX queues for too long. Queues are 
    //disabled either because of disassociation or low resource scenarios. In
    //case of disassociation it is ok to ignore this. But if associated, we have
    //do possible recovery here
+
+   VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+              "num_bytes AC0: %d AC1: %d AC2: %d AC3: %d",
+              pAdapter->wmm_tx_queue[0].count,
+              pAdapter->wmm_tx_queue[1].count,
+              pAdapter->wmm_tx_queue[2].count,
+              pAdapter->wmm_tx_queue[3].count);
+
+   VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+              "tx_suspend AC0: %d AC1: %d AC2: %d AC3: %d",
+              pAdapter->isTxSuspended[0],
+              pAdapter->isTxSuspended[1],
+              pAdapter->isTxSuspended[2],
+              pAdapter->isTxSuspended[3]);
+
+   for (i = 0; i < 8; i++)
+   {
+      txq = netdev_get_tx_queue(dev, i);
+      VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "Queue%d status: %d", i, netif_tx_queue_stopped(txq));
+   }
+
+   VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+              "carrier state: %d", netif_carrier_ok(dev));
 } 
 
 
