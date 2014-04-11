@@ -2011,6 +2011,11 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_MAX                 ( 1 )
 #define CFG_ENABLE_STRICT_REGULATORY_FOR_FCC_DEFAULT             ( 1 )
 
+//Enable debug for remain on channel issues
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME    "gDebugP2pRemainOnChannel"
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_DEFAULT ( 0 )
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN     ( 0 )
+#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX     ( 1 )
 
 /*--------------------------------------------------------------------------- 
   Type declarations
@@ -2428,6 +2433,7 @@ typedef struct
    v_BOOL_t                    advertiseConcurrentOperation;
    eHddDot11Mode               sapDot11Mode;
    v_BOOL_t                    gEnableStrictRegulatoryForFCC;
+   v_BOOL_t                    debugP2pRemainOnChannel;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
