@@ -3067,7 +3067,6 @@ static int iw_set_priv(struct net_device *dev,
         country_code =  cmd + 8;
 
         init_completion(&pAdapter->change_country_code);
-
         eHal_status = sme_ChangeCountryCode(pHddCtx->hHal,
                                             (void *)(tSmeChangeCountryCallback)wlan_hdd_change_country_code_callback,
                                             country_code,
@@ -4313,10 +4312,10 @@ static int iw_setint_getnone(struct net_device *dev, struct iw_request_info *inf
                 set_value = 0;
                 startChannel = 1;
                 //BEGIN MOT a19110 IKJBXLINE-2149 MHS frequency band support
-                endChannel   = 14;
+            //MOT Jmng34 IKVPREL2KK-4343 : Temporary solution to stop MHS beaconing on channel 12 and 13
+                endChannel   = 11;
                 //END IKJBXLINE-2149
             }
-
             ret = iw_softap_set_channel_range( dev, startChannel, endChannel, set_value);
 
             break;
