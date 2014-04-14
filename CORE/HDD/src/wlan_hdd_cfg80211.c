@@ -7937,7 +7937,7 @@ static int wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
     pPnoRequest->scanTimers.aTimerValues[1].uTimerRepeat = 0;
     pPnoRequest->scanTimers.aTimerValues[1].uTimerValue = 480;
     //END IKJBMR2-1528
-    pPnoRequest->modePNO = SIR_PNO_MODE_ON_SUSPEND;
+    pPnoRequest->modePNO = SIR_PNO_MODE_IMMEDIATE;
 
     INIT_COMPLETION(pAdapter->pno_comp_var);
     pPnoRequest->statusCallback = hdd_cfg80211_sched_scan_start_status_cb;
