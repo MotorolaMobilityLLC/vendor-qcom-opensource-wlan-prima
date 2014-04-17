@@ -12745,7 +12745,7 @@ WDI_Status WDI_ProcessSetMaxTxPowerPerBandReq
   wpt_uint8*                             pSendBuffer         = NULL;
   wpt_uint16                             usDataOffset        = 0;
   wpt_uint16                             usSendSize          = 0;
-  tpSetMaxTxPwrPerBandReq                phalSetMxTxPwrPerBand = NULL;
+  tpSetMaxTxPwrPerBandParams             phalSetMxTxPwrPerBand = NULL;
   WDI_Status                             rValue = WDI_STATUS_SUCCESS;
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -12788,11 +12788,11 @@ WDI_Status WDI_ProcessSetMaxTxPowerPerBandReq
   }
 
 
-  phalSetMxTxPwrPerBand = (tpSetMaxTxPwrPerBandReq)(pSendBuffer + usDataOffset);
-  phalSetMxTxPwrPerBand->setMaxTxPwrPerBandParams.bandInfo = \
+  phalSetMxTxPwrPerBand = (tpSetMaxTxPwrPerBandParams)(pSendBuffer + usDataOffset);
+  phalSetMxTxPwrPerBand->bandInfo = \
   pwdiSetMaxTxPowerPerBandParams->wdiMaxTxPowerPerBandInfo.bandInfo;
 
-  phalSetMxTxPwrPerBand->setMaxTxPwrPerBandParams.power = \
+  phalSetMxTxPwrPerBand->power = \
   pwdiSetMaxTxPowerPerBandParams->wdiMaxTxPowerPerBandInfo.ucPower;
 
   pWDICtx->wdiReqStatusCB     = pwdiSetMaxTxPowerPerBandParams->wdiReqStatusCB;
@@ -21302,7 +21302,10 @@ WDI_SendMsg
        (eWLAN_PAL_STATUS_E_RESOURCES != ret))
    {
      WPAL_TRACE(eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_FATAL,
-                "Failed to send message over the bus - catastrophic failure");
+                "Failed to send message with expected response %s (%d)"
+                " over the bus - catastrophic failure",
+                WDI_getRespMsgString(pWDICtx->wdiExpectedResponse),
+                pWDICtx->wdiExpectedResponse);
 
      wdiStatus = WDI_STATUS_E_FAILURE;
    }
