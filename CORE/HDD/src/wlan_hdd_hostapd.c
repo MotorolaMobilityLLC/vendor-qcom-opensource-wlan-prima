@@ -2667,45 +2667,67 @@ static iw_softap_getassoc_stamacaddr(struct net_device *dev,
                         union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pHostapdAdapter = (netdev_priv(dev));
-    unsigned int maclist_index;
     hdd_station_info_t *pStaInfo = pHostapdAdapter->aStaInfo;
-    char maclist_null = '\0';
-    int cnt = 0, len;
+    char *buf;
+    int cnt = 0;
+    int left;
+    int ret = 0;
+    /* maclist_index must be u32 to match userspace */
+    u32 maclist_index;
 
+    /*
+     * NOTE WELL: this is a "get" ioctl but it uses an even ioctl
+     * number, and even numbered iocts are supposed to have "set"
+     * semantics.  Hence the wireless extensions support in the kernel
+     * won't correctly copy the result to userspace, so the ioctl
+     * handler itself must copy the data.  Output format is 32-bit
+     * record length, followed by 0 or more 6-byte STA MAC addresses.
+     *
+     * Further note that due to the incorrect semantics, the "iwpriv"
+     * userspace application is unable to correctly invoke this API,
+     * hence it is not registered in the hostapd_private_args.  This
+     * API can only be invoked by directly invoking the ioctl() system
+     * call.
+     */
 
-    maclist_index = sizeof(unsigned long int);
-    len = wrqu->data.length;
-
-    spin_lock_bh( &pHostapdAdapter->staInfo_lock );
-    while((cnt < WLAN_MAX_STA_COUNT) && (len > (sizeof(v_MACADDR_t)+1))) {
-        if (TRUE == pStaInfo[cnt].isUsed) {
-            
-            if(!IS_BROADCAST_MAC(pStaInfo[cnt].macAddrSTA.bytes)) {
-                if (copy_to_user((void *)wrqu->data.pointer + maclist_index,
-                    (void *)&(pStaInfo[cnt].macAddrSTA), sizeof(v_MACADDR_t)))
-                {
-                    hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
-                    return -EFAULT;
-                }
-                maclist_index += sizeof(v_MACADDR_t);
-                len -= sizeof(v_MACADDR_t);
-            }
-        }
-        cnt++;
-    } 
-    spin_unlock_bh( &pHostapdAdapter->staInfo_lock );
-
-    wrqu->data.length -= len;
-    if (copy_to_user((void *)wrqu->data.pointer + maclist_index,
-                     (void *)&maclist_null, sizeof(maclist_null)) ||
-        copy_to_user((void *)wrqu->data.pointer,
-                     (void *)&wrqu->data.length, sizeof(unsigned long int)))
-    {
-        hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
-        return -EFAULT;
+    /* make sure userspace allocated a reasonable buffer size */
+    if (wrqu->data.length < sizeof(maclist_index)) {
+        hddLog(LOG1, "%s: invalid userspace buffer", __func__);
+        return -EINVAL;
     }
 
-    return 0;
+    /* allocate local buffer to build the response */
+    buf = kmalloc(wrqu->data.length, GFP_KERNEL);
+    if (!buf) {
+        hddLog(LOG1, "%s: failed to allocate response buffer", __func__);
+        return -ENOMEM;
+    }
+
+    /* start indexing beyond where the record count will be written */
+    maclist_index = sizeof(maclist_index);
+    left = wrqu->data.length - maclist_index;
+
+    spin_lock_bh(&pHostapdAdapter->staInfo_lock);
+    while ((cnt < WLAN_MAX_STA_COUNT) && (left >= VOS_MAC_ADDR_SIZE)) {
+        if ((pStaInfo[cnt].isUsed) &&
+            (!IS_BROADCAST_MAC(pStaInfo[cnt].macAddrSTA.bytes))) {
+            memcpy(&buf[maclist_index], &(pStaInfo[cnt].macAddrSTA),
+                   VOS_MAC_ADDR_SIZE);
+            maclist_index += VOS_MAC_ADDR_SIZE;
+            left -= VOS_MAC_ADDR_SIZE;
+        }
+        cnt++;
+    }
+    spin_unlock_bh(&pHostapdAdapter->staInfo_lock);
+
+    *((u32 *)buf) = maclist_index;
+    wrqu->data.length = maclist_index;
+    if (copy_to_user(wrqu->data.pointer, buf, maclist_index)) {
+        hddLog(LOG1, "%s: failed to copy response to user buffer", __func__);
+        ret = -EFAULT;
+    }
+    kfree(buf);
+    return ret;
 }
 
 /* Usage:
@@ -4102,7 +4124,7 @@ int iw_get_softap_linkspeed(struct net_device *dev,
    unsigned short staId;
    int len = sizeof(v_U32_t)+1;
    v_BYTE_t macAddress[VOS_MAC_ADDR_SIZE];
-   VOS_STATUS status;
+   VOS_STATUS status = VOS_STATUS_E_FAILURE;
    int rc, valid;
 
    pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
@@ -4115,37 +4137,37 @@ int iw_get_softap_linkspeed(struct net_device *dev,
        return valid;
    }
 
-   hddLog(VOS_TRACE_LEVEL_INFO, "%s wrqu->data.length= %d\n", __func__, wrqu->data.length);
-   if (wrqu->data.length != MAC_ADDRESS_STR_LEN)
+   hddLog(VOS_TRACE_LEVEL_INFO, "%s wrqu->data.length= %d\n",
+          __func__, wrqu->data.length);
+
+   if (wrqu->data.length >= MAC_ADDRESS_STR_LEN - 1)
    {
-       hddLog(LOG1, "Invalid length");
-       return -EINVAL;
-   }
-   pmacAddress = kmalloc(MAC_ADDRESS_STR_LEN, GFP_KERNEL);
-   if(NULL == pmacAddress) {
-       hddLog(LOG1, "unable to allocate memory");
-       return -ENOMEM;
-   }
-   if (copy_from_user((void *)pmacAddress,
-       wrqu->data.pointer, wrqu->data.length))
-   {
-       hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
+       pmacAddress = kmalloc(MAC_ADDRESS_STR_LEN, GFP_KERNEL);
+       if (NULL == pmacAddress) {
+           hddLog(LOG1, "unable to allocate memory");
+           return -ENOMEM;
+       }
+       if (copy_from_user((void *)pmacAddress,
+          wrqu->data.pointer, MAC_ADDRESS_STR_LEN))
+       {
+           hddLog(LOG1, "%s: failed to copy data to user buffer", __func__);
+           kfree(pmacAddress);
+           return -EFAULT;
+       }
+       pmacAddress[MAC_ADDRESS_STR_LEN] = '\0';
+
+       status = hdd_string_to_hex(pmacAddress, MAC_ADDRESS_STR_LEN, macAddress);
        kfree(pmacAddress);
-       return -EFAULT;
+
+       if (!VOS_IS_STATUS_SUCCESS(status ))
+       {
+           hddLog(VOS_TRACE_LEVEL_ERROR, FL("String to Hex conversion Failed"));
+       }
    }
-
-   status = hdd_string_to_hex (pmacAddress, wrqu->data.length, macAddress );
-   kfree(pmacAddress);
-
-   if (!VOS_IS_STATUS_SUCCESS(status ))
-   {
-      hddLog(VOS_TRACE_LEVEL_ERROR, FL("String to Hex conversion Failed"));
-   }
-
    /* If no mac address is passed and/or its length is less than 17,
     * link speed for first connected client will be returned.
     */
-   if (!VOS_IS_STATUS_SUCCESS(status ) || wrqu->data.length < 17)
+   if (wrqu->data.length < 17 || !VOS_IS_STATUS_SUCCESS(status ))
    {
       status = hdd_softap_GetConnectedStaId(pHostapdAdapter, (void *)(&staId));
    }
@@ -4258,9 +4280,12 @@ static const iw_handler      hostapd_handler[] =
    (iw_handler) NULL,           /* SIOCSIWPMKSA */
 };
 
-#define    IW_PRIV_TYPE_OPTIE    (IW_PRIV_TYPE_BYTE | QCSAP_MAX_OPT_IE)
-#define    IW_PRIV_TYPE_MLME \
-  (IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_mlme))
+/*
+ * Note that the following ioctls were defined with semantics which
+ * cannot be handled by the "iwpriv" userspace application and hence
+ * they are not included in the hostapd_private_args array
+ *     QCSAP_IOCTL_ASSOC_STA_MACADDR
+ */
 
 static const struct iw_priv_args hostapd_private_args[] = {
   { QCSAP_IOCTL_SETPARAM,
@@ -4308,9 +4333,7 @@ static const struct iw_priv_args hostapd_private_args[] = {
       IW_PRIV_TYPE_BYTE | sizeof(sQcSapreq_WPSPBCProbeReqIES_t) | IW_PRIV_SIZE_FIXED | 1, 0, "getProbeReqIEs" },
   { QCSAP_IOCTL_GET_CHANNEL, 0,
       IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getchannel" },
-  { QCSAP_IOCTL_ASSOC_STA_MACADDR, 0,
-      IW_PRIV_TYPE_BYTE | /*((WLAN_MAX_STA_COUNT*6)+100)*/1 , "get_assoc_stamac" },
-    { QCSAP_IOCTL_DISASSOC_STA,
+  { QCSAP_IOCTL_DISASSOC_STA,
         IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 6 , 0, "disassoc_sta" },
   { QCSAP_IOCTL_AP_STATS,
         IW_PRIV_TYPE_BYTE | QCSAP_MAX_WSC_IE, 0, "ap_stats" },
