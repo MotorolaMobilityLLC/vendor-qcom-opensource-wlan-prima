@@ -4682,3 +4682,15 @@ HAL
 3    50    10
 *
 *
+
+* Debug p2p remain on channel
+*
+WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL I 4 7
+V    RW    NP
+NONE
+0    1    0
+V    RW    NP
+NONE
+0    1    0
+*
+*
