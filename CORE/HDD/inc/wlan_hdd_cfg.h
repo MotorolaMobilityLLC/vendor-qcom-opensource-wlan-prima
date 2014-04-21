@@ -48,10 +48,6 @@
 
   \brief Android WLAN Adapter Configuration functions
 
-               Copyright 2008 (c) Qualcomm, Incorporated.
-               All Rights Reserved.
-               Qualcomm Confidential and Proprietary.
-
   ==========================================================================*/
 
 /* $HEADER$ */
@@ -2037,6 +2033,18 @@ This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1 */
 #define CFG_WLAN_LOGGING_NUM_BUF_DEFAULT  ( 32 )
 #endif //WLAN_LOGGING_SOCK_SVC_ENABLE
 
+/*
+ * Connection related log Enable/Disable.
+ * 0x1 - Enable mgmt pkt logs (no probe req/rsp).
+ * 0x2 - Enable EAPOL pkt logs.
+ * 0x4 - Enable DHCP pkt logs.
+ * 0x0 - Disable all the above connection related logs.
+ */
+#define CFG_ENABLE_DEBUG_CONNECT_ISSUE             "gEnableDebugLog"
+#define CFG_ENABLE_DEBUG_CONNECT_ISSUE_MIN         (0)
+#define CFG_ENABLE_DEBUG_CONNECT_ISSUE_MAX         (0xFF)
+#define CFG_ENABLE_DEBUG_CONNECT_ISSUE_DEFAULT     (0)
+
 /*--------------------------------------------------------------------------- 
   Type declarations
   -------------------------------------------------------------------------*/ 
@@ -2460,6 +2468,7 @@ typedef struct
    v_U32_t                     wlanLoggingFEToConsole;
    v_U32_t                     wlanLoggingNumBuf;
 #endif
+   v_U32_t                     gEnableDebugLog;
 } hdd_config_t;
 /*--------------------------------------------------------------------------- 
   Function declarations and documenation
