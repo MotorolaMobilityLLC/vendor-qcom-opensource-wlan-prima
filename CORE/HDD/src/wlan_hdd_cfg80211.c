@@ -2919,6 +2919,13 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
                         hdd_close_adapter(pHddCtx, pP2pAdapter, VOS_TRUE);
                     }
                 }
+                //Disable IMPS & BMPS for SAP/GO
+                if(VOS_STATUS_E_FAILURE ==
+                       hdd_disable_bmps_imps(pHddCtx, WLAN_HDD_P2P_GO))
+                {
+                    //Fail to Exit BMPS
+                    VOS_ASSERT(0);
+                }
 
                 //De-init the adapter.
                 hdd_stop_adapter( pHddCtx, pAdapter );
@@ -2926,19 +2933,6 @@ int wlan_hdd_cfg80211_change_iface( struct wiphy *wiphy,
                 memset(&pAdapter->sessionCtx, 0, sizeof(pAdapter->sessionCtx));
                 pAdapter->device_mode = (type == NL80211_IFTYPE_AP) ?
                                    WLAN_HDD_SOFTAP : WLAN_HDD_P2P_GO;
-
-                //Disable BMPS and IMPS if enabled
-                //before starting Go
-                if(WLAN_HDD_P2P_GO == pAdapter->device_mode)
-                {
-                    if(VOS_STATUS_E_FAILURE ==
-                       hdd_disable_bmps_imps(pHddCtx, WLAN_HDD_P2P_GO))
-                    {
-                       //Fail to Exit BMPS
-                       VOS_ASSERT(0);
-                    }
-                }
-
                 if ((WLAN_HDD_SOFTAP == pAdapter->device_mode) &&
                     (pConfig->apRandomBssidEnabled))
                 {
