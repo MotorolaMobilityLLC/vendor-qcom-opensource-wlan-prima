@@ -67,6 +67,9 @@
 #define HDD_ETHERTYPE_WAI                  ( 0x88b4 )
 #endif
 
+#define HDD_ETHERTYPE_ARP                  ( 0x0806 )
+#define HDD_ETHERTYPE_ARP_SIZE               42
+
 #define HDD_80211_HEADER_LEN      24
 #define HDD_80211_HEADER_QOS_CTL  2
 #define HDD_LLC_HDR_LEN           6
