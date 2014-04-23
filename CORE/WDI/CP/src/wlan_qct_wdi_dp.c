@@ -551,6 +551,12 @@ WDI_FillTxBd
            pBd->bdRate = WDI_BDRATE_CTRL_FRAME;
         }
 #endif
+        if(ucTxFlag & WDI_USE_BD_RATE_MASK)
+        {
+            pBd->bdRate = WDI_BDRATE_BCDATA_FRAME;
+            VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "arp: %s",__func__);
+        }
+
         pBd->rmf    = WDI_RMF_DISABLED;     
 
         /* sanity: Might already be set by caller, but enforce it here again */

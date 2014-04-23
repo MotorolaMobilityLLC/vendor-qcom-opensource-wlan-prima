@@ -7325,6 +7325,14 @@ WLANTL_STATxAuth
   }
 #endif /* FEATURE_WLAN_TDLS */
 
+  if( tlMetaInfo.ucIsArp )
+  {
+    /*Send ARP at lowest Phy rate and through WQ5 */
+    VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "send arp pkt via WQ5 @ low rate");
+    ucTxFlag |= HAL_USE_BD_RATE_MASK;
+    ucTxFlag |= HAL_USE_FW_IN_TX_PATH;
+  }
+
   vosStatus = (VOS_STATUS)WDA_DS_BuildTxPacketInfo( pvosGCtx, 
                      vosDataBuff , &vDestMacAddr,
                      tlMetaInfo.ucDisableFrmXtl, &usPktLen,
