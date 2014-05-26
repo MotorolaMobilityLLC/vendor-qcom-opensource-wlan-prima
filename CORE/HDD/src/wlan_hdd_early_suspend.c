@@ -1266,7 +1266,7 @@ static void hdd_conf_suspend_ind(hdd_context_t* pHddCtx,
          * function takes care of checking necessary conditions before
          * configuring.
          */
-        wlan_hdd_set_mc_addr_list(pAdapter, TRUE);
+        //wlan_hdd_set_mc_addr_list(pAdapter, TRUE);
 #endif
     }
 
@@ -1330,7 +1330,7 @@ static void hdd_conf_resume_ind(hdd_adapter_t *pAdapter)
     /* Filer was applied during suspend inditication
      * clear it when we resume.
      */
-    wlan_hdd_set_mc_addr_list(pAdapter, FALSE);
+    //wlan_hdd_set_mc_addr_list(pAdapter, FALSE);
 #endif
 }
 
