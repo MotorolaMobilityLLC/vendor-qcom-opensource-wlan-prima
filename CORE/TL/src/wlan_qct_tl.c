@@ -5789,6 +5789,16 @@ WLANTL_RxFrames
              * So it will lead to low resource condition in Rx Data Path.*/
           ((WDA_IS_RX_BCAST(pvBDHeader) == 0)))
       {
+        if( WDA_IsSelfSTA(pvosGCtx,ucSTAId))
+        {
+           //drop packet for Self STA index
+           TLLOGW(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
+                  "%s: Packet dropped for Self STA with staId %d ", __func__, ucSTAId ));
+
+           vos_pkt_return_packet(vosTempBuff);
+           vosTempBuff = vosDataBuff;
+           continue;
+        }
         uDPUSig = WDA_GET_RX_DPUSIG( pvBDHeader );
           //Station has not yet been registered with TL - cache the frame
         TLLOGW(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_WARN,
