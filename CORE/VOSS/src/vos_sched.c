@@ -419,10 +419,9 @@ VosMCThread
                 "%s: MC thread signaled to shutdown", __func__);
         shutdown = VOS_TRUE;
         /* Check for any Suspend Indication */
-        if(test_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag))
+        if (test_and_clear_bit(MC_SUSPEND_EVENT_MASK,
+                               &pSchedContext->mcEventFlag))
         {
-           clear_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag);
-        
            /* Unblock anyone waiting on suspend */
            complete(&pHddCtx->mc_sus_event_var);
         }
@@ -616,9 +615,9 @@ VosMCThread
         continue;
       }
       /* Check for any Suspend Indication */
-      if(test_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag))
+      if (test_and_clear_bit(MC_SUSPEND_EVENT_MASK,
+                             &pSchedContext->mcEventFlag))
       {
-        clear_bit(MC_SUSPEND_EVENT_MASK, &pSchedContext->mcEventFlag);
         spin_lock(&pSchedContext->McThreadLock);
 
         /* Mc Thread Suspended */
@@ -913,10 +912,9 @@ static int VosTXThread ( void * Arg )
                  "%s: TX thread signaled to shutdown", __func__);
         shutdown = VOS_TRUE;
         /* Check for any Suspend Indication */
-        if(test_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag))
+        if (test_and_clear_bit(TX_SUSPEND_EVENT_MASK,
+                               &pSchedContext->txEventFlag))
         {
-           clear_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag);
-        
            /* Unblock anyone waiting on suspend */
            complete(&pHddCtx->tx_sus_event_var);
         }
@@ -1007,9 +1005,9 @@ static int VosTXThread ( void * Arg )
         continue;
       }
       /* Check for any Suspend Indication */
-      if(test_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag))
+      if (test_and_clear_bit(TX_SUSPEND_EVENT_MASK,
+                             &pSchedContext->txEventFlag))
       {
-        clear_bit(TX_SUSPEND_EVENT_MASK, &pSchedContext->txEventFlag);
         spin_lock(&pSchedContext->TxThreadLock);
 
         /* Tx Thread Suspended */
@@ -1113,10 +1111,9 @@ static int VosRXThread ( void * Arg )
                  "%s: RX thread signaled to shutdown", __func__);
         shutdown = VOS_TRUE;
         /* Check for any Suspend Indication */
-        if(test_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag))
+        if (test_and_clear_bit(RX_SUSPEND_EVENT_MASK,
+                               &pSchedContext->rxEventFlag))
         {
-           clear_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag);
-        
            /* Unblock anyone waiting on suspend */
            complete(&pHddCtx->rx_sus_event_var);
         }
@@ -1213,9 +1210,9 @@ static int VosRXThread ( void * Arg )
       }
 
       /* Check for any Suspend Indication */
-      if(test_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag))
+      if (test_and_clear_bit(RX_SUSPEND_EVENT_MASK,
+                             &pSchedContext->rxEventFlag))
       {
-        clear_bit(RX_SUSPEND_EVENT_MASK, &pSchedContext->rxEventFlag);
         spin_lock(&pSchedContext->RxThreadLock);
 
         /* Rx Thread Suspended */
