@@ -1783,7 +1783,8 @@ int iw_softap_get_channel_list(struct net_device *dev,
         return -EIO;
     }
 
-    if(REGDOMAIN_FCC == domainIdCurrentSoftap)
+    if(REGDOMAIN_FCC == domainIdCurrentSoftap &&
+            pHddCtx->cfg_ini->gEnableStrictRegulatoryForFCC)
     {
         for(i = 0; i < temp_num_channels; i++)
         {
