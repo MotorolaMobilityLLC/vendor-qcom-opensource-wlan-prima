@@ -226,7 +226,7 @@ static CountryInfoTable_t countryInfoTable =
       {REGDOMAIN_FCC, {'M', 'T'}}, //MALTA
       {REGDOMAIN_ETSI, {'M', 'U'}}, //MAURITIUS
       {REGDOMAIN_ETSI, {'M', 'W'}}, //MALAWI
-      {REGDOMAIN_FCC, {'M', 'X'}}, //MEXICO
+      {REGDOMAIN_APAC, {'M', 'X'}}, //MEXICO
       {REGDOMAIN_ETSI, {'M', 'Y'}}, //MALAYSIA
       {REGDOMAIN_ETSI, {'N', 'G'}}, //NIGERIA
       {REGDOMAIN_FCC, {'N', 'I'}}, //NICARAGUA
