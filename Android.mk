@@ -12,6 +12,7 @@ WLAN_CHIPSET := pronto
 WLAN_SELECT := CONFIG_PRONTO_WLAN=m
 endif
 
+
 # Build/Package only in case of supported target
 ifneq ($(WLAN_CHIPSET),)
 
@@ -79,6 +80,7 @@ KBUILD_OPTIONS := WLAN_ROOT=../$(WLAN_BLD_DIR)/prima
 KBUILD_OPTIONS += MODNAME=wlan
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(WLAN_SELECT)
+KBUILD_OPTIONS += BOARD_USES_UTAG_WIFI_MAC=$(BOARD_USES_UTAG_WIFI_MAC)
 
 
 VERSION=$(shell grep -w "VERSION =" $(TOP)/kernel/Makefile | sed 's/^VERSION = //' )
