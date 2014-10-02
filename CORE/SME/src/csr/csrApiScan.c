@@ -417,6 +417,11 @@ static void csrSetDefaultScanTiming( tpAniSirGlobal pMac, tSirScanType scanType,
 #ifdef WLAN_AP_STA_CONCURRENCY
     if(csrIsAnySessionConnected(pMac))
     {
+        //CTSR-3239 wlan Ini scan parameters not effective on DFS channe
+        //Reset passive scan time as per ini parameter.
+        ccmCfgSetInt(pMac->hHdd,WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME,
+                     pMac->roam.configParam.nPassiveMaxChnTimeConc,
+                     NULL,eANI_BOOLEAN_FALSE);
         //If multi-session, use the appropriate default scan times 
         if(scanType == eSIR_ACTIVE_SCAN)
         {
@@ -441,6 +446,10 @@ static void csrSetDefaultScanTiming( tpAniSirGlobal pMac, tSirScanType scanType,
     //This portion of the code executed if multi-session not supported
     //(WLAN_AP_STA_CONCURRENCY not defined) or no multi-session.
     //Use the "regular" (non-concurrency) default scan timing.
+    //CTSR-3239 wlan Fix dwell time of passive channels for disconne
+    ccmCfgSetInt(pMac->hHdd,WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME,
+                     pMac->roam.configParam.nPassiveMaxChnTime,
+                     NULL,eANI_BOOLEAN_FALSE);
     if(pScanRequest->scanType == eSIR_ACTIVE_SCAN)
     {
         pScanRequest->maxChnTime = pMac->roam.configParam.nActiveMaxChnTime;
