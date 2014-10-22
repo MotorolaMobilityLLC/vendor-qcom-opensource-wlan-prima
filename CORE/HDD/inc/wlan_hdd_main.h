@@ -1441,4 +1441,6 @@ void hdd_deinit_batch_scan(hdd_adapter_t *pAdapter);
 
 boolean hdd_is_5g_supported(hdd_context_t * pHddCtx);
 
+VOS_STATUS wlan_hdd_cancel_remain_on_channel(hdd_context_t *pHddCtx);
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
