@@ -164,10 +164,10 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_SET_TDLS_SEC_OFF_CHAN_OFFSET  15
 #define WE_SET_TDLS_OFF_CHAN_MODE        16
 #endif
-#define  WE_SET_SCAN_BAND_PREFERENCE     17
 
 #define WE_SET_CHANNEL_RANGE 17   // Motorola, IKJBREL1-4181
 #define WE_SET_IPV6_FILTER_STATE 18 // IKJB42MAIN-1244, Motorola, a19091
+#define  WE_SET_SCAN_BAND_PREFERENCE     19
 
 
 /* Private ioctls and their sub-ioctls */
