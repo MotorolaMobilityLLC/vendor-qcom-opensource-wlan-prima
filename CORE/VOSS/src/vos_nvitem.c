@@ -3700,9 +3700,12 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
                     NV_CHANNEL_DFS;
 
                 // Cap the TX power by the power limits specified in NV for the regdomain
-                wiphy->bands[i]->channels[j].max_power =
-                        MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit,
-                            (tANI_S8) ((wiphy->bands[i]->channels[j].max_power)));
+                if (gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit)
+                {
+                    wiphy->bands[i]->channels[j].max_power =
+                           MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit,
+                              (tANI_S8) ((wiphy->bands[i]->channels[j].max_power)));
+                }
 
                 pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit =
                     (tANI_S8) ((wiphy->bands[i]->channels[j].max_power));
@@ -3739,9 +3742,12 @@ static int create_linux_regulatory_entry(struct wiphy *wiphy,
                     NV_CHANNEL_ENABLE;
 
                 // Cap the TX power by the power limits specified in NV for the regdomain
-                wiphy->bands[i]->channels[j].max_power =
-                        MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit,
-                            (tANI_S8) ((wiphy->bands[i]->channels[j].max_power)));
+                if (gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit)
+                {
+                    wiphy->bands[i]->channels[j].max_power =
+                           MIN(gnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit,
+                              (tANI_S8) ((wiphy->bands[i]->channels[j].max_power)));
+                }
 
                 /* max_power is in dBm */
                 pnvEFSTable->halnv.tables.regDomains[temp_reg_domain].channels[k].pwrLimit =
