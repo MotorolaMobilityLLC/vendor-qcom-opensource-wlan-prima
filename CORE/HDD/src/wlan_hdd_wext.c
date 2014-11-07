@@ -7545,6 +7545,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
     int retVal;
     v_U8_t mcFilterReset = FALSE;
+    struct iw_point s_priv_data;
     // IKJB42MAIN-1244, Motorola, a19091 - END
 
     //IKHSS7-35965, a19091, Motorola changes -- BEGIN
@@ -7556,7 +7557,19 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
         return -ENOMEM;
     }
 
-    if(copy_from_user(pRequest, wrqu->data.pointer, sizeof(tPacketFilterCfg))) {
+    /* helper function to get iwreq_data with compat handling. */
+    if (hdd_priv_get_data(&s_priv_data, wrqu))
+    {
+       return -EINVAL;
+    }
+
+    /* make sure all params are correctly passed to function */
+    if ((NULL == s_priv_data.pointer) )
+    {
+       return -EINVAL;
+    }
+
+    if(copy_from_user(pRequest, (char*)(s_priv_data.pointer), sizeof(tPacketFilterCfg))) {
         hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user -- data pointer failed! bailing",
                 __FUNCTION__);
         kfree(pRequest);
