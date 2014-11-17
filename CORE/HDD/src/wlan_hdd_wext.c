@@ -3306,30 +3306,16 @@ static int __iw_set_priv(struct net_device *dev,
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     char *cmd = NULL;
-    int cmd_len = 0;
+    int cmd_len = wrqu->data.length;
     int ret = 0;
     int rc = 0;
     VOS_STATUS vos_status = VOS_STATUS_SUCCESS;
 
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-    struct iw_point s_priv_data;
+
     ENTER();
-
-    /* helper function to get iwreq_data with compat handling. */
-    if (hdd_priv_get_data(&s_priv_data, wrqu))
-    {
-       return -EINVAL;
-    }
-
-    /* make sure all params are correctly passed to function */
-    if ((NULL == s_priv_data.pointer) || (0 == s_priv_data.length))
-    {
-       return -EINVAL;
-    }
-    cmd_len = s_priv_data.length;
-    /* ODD number is used for set, copy data using copy_from_user */
-    cmd = mem_alloc_copy_from_user_helper(s_priv_data.pointer,
-                                               s_priv_data.length);
+    cmd = mem_alloc_copy_from_user_helper(wrqu->data.pointer,
+                                          wrqu->data.length);
     if (NULL == cmd)
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -5259,30 +5245,17 @@ static int __iw_get_char_setnone(struct net_device *dev,
                                  union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-    int sub_cmd = 0;
+    int sub_cmd = wrqu->data.flags;
 #ifdef WLAN_FEATURE_11W
     hdd_wext_state_t *pWextState;
 #endif
-    struct iw_point s_priv_data;
+
     if (pAdapter == NULL)
     {
          VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                    "%s: pAdapter is NULL!", __func__);
          return -EINVAL;
     }
-    /* helper function to get iwreq_data with compat handling. */
-    if (hdd_priv_get_data(&s_priv_data, wrqu))
-    {
-       return -EINVAL;
-    }
-
-    /* make sure all params are correctly passed to function */
-    if ((NULL == s_priv_data.pointer) || (0 == s_priv_data.length))
-    {
-       return -EINVAL;
-    }
-
-    sub_cmd = s_priv_data.flags;
 #ifdef WLAN_FEATURE_11W
     pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
 #endif
@@ -7858,26 +7831,14 @@ VOS_STATUS iw_set_pno(struct net_device *dev, struct iw_request_info *info,
   char *ptr;
   v_U8_t i,j, ucParams, ucMode;
   eHalStatus status = eHAL_STATUS_FAILURE;
-  struct iw_point s_priv_data;
-    /* helper function to get iwreq_data with compat handling. */
-    if (hdd_priv_get_data(&s_priv_data, wrqu))
-    {
-       return -EINVAL;
-    }
-
-    /* make sure all params are correctly passed to function */
-    if ((NULL == s_priv_data.pointer) || (0 == s_priv_data.length))
-    {
-       return -EINVAL;
-    }
   /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
             "PNO data len %d data %s",
-            s_priv_data.length,
+            wrqu->data.length,
             extra);
 
-  if (s_priv_data.length <= nOffset )
+  if (wrqu->data.length <= nOffset )
   {
     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN, "PNO input is not correct");
     return VOS_STATUS_E_FAILURE;
