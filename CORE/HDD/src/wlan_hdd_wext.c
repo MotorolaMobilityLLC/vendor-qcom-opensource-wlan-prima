@@ -4418,7 +4418,6 @@ static int __iw_setint_getnone(struct net_device *dev,
 #ifdef CONFIG_HAS_EARLYSUSPEND
     v_U8_t nEnableSuspendOld;
 #endif
-    struct iw_point s_priv_data;
     INIT_COMPLETION(pWextState->completion_var);
 
     if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
@@ -4430,18 +4429,7 @@ static int __iw_setint_getnone(struct net_device *dev,
     if(value == NULL)
        return -ENOMEM;
 
-    /* helper function to get iwreq_data with compat handling. */
-    if (hdd_priv_get_data(&s_priv_data, wrqu))
-    {
-       return -EINVAL;
-    }
-
-    /* make sure all params are correctly passed to function */
-    if ((NULL == s_priv_data.pointer) )
-    {
-       return -EINVAL;
-    }
-    if(copy_from_user((char *) value, (char*)(s_priv_data.pointer), s_priv_data.length)) {
+    if(copy_from_user((char *) value, (char*)(wrqu->data.pointer), cmd_len)) {
             hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user --data pointer failed! bailing",
                  __FUNCTION__);
          kfree(value);

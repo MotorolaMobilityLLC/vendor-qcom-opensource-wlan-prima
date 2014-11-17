@@ -1913,24 +1913,10 @@ static __iw_softap_set_max_tx_power(struct net_device *dev,
     int set_value;
     tSirMacAddr bssid = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     tSirMacAddr selfMac = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-    struct iw_point s_priv_data;
 
     if (NULL == value)
         return -ENOMEM;
-
-   /* helper function to get iwreq_data with compat handling. */
-   if (hdd_priv_get_data(&s_priv_data, wrqu))
-   {
-      return -EINVAL;
-   }
-
-   if ((NULL == s_priv_data.pointer))
-   {
-      return -EINVAL;
-   }
-
-
-    if(copy_from_user((char *) value, (char*)(s_priv_data.pointer), s_priv_data.length)) {
+    if(copy_from_user((char *) value, (char*)(wrqu->data.pointer), cmd_len)) {
         hddLog(VOS_TRACE_LEVEL_FATAL, "%s -- copy_from_user --data pointer failed! bailing",
                 __func__);
         kfree(value);
