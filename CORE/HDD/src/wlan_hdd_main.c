@@ -4958,6 +4958,7 @@ VOS_STATUS hdd_request_firmware(char *pfileName,v_VOID_t *pCtx,v_VOID_t **ppfw_d
    int status;
    VOS_STATUS retval = VOS_STATUS_SUCCESS;
    hdd_context_t *pHddCtx = (hdd_context_t*)pCtx;
+   const char* pdtFileName = NULL;
    ENTER();
 
    if( (!strcmp(WLAN_FW_FILE, pfileName)) ) {
@@ -4978,20 +4979,20 @@ VOS_STATUS hdd_request_firmware(char *pfileName,v_VOID_t *pCtx,v_VOID_t **ppfw_d
        }
    }
    else if(!strcmp(WLAN_NV_FILE, pfileName)) {
-
-       status = request_firmware(&pHddCtx->nv, pfileName, pHddCtx->parent_dev);
-
+       pdtFileName = wcnss_get_nv_file_name();
+       status = request_firmware(&pHddCtx->nv,
+                                 pdtFileName ? pdtFileName : pfileName,
+                                 pHddCtx->parent_dev);
        if(status || !pHddCtx->nv || !pHddCtx->nv->data) {
            hddLog(VOS_TRACE_LEVEL_FATAL, "%s: nv %s download failed",
-                  __func__, pfileName);
+                  __func__, pdtFileName ? pdtFileName : pfileName);
            retval = VOS_STATUS_E_FAILURE;
        }
-
        else {
          *ppfw_data = (v_VOID_t *)pHddCtx->nv->data;
          *pSize = pHddCtx->nv->size;
-          hddLog(VOS_TRACE_LEVEL_INFO, "%s: nv file size = %d",
-                 __func__, *pSize);
+          hddLog(VOS_TRACE_LEVEL_ERROR, "%s: nv file %s size = %d",
+                 __func__, pdtFileName ? pdtFileName : pfileName, *pSize);
        }
    }
 #ifdef WLAN_NV_OTA_UPGRADE /* Motorola OTA changes */
