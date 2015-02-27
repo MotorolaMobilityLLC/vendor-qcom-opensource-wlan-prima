@@ -1,5 +1,5 @@
 /*
-  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+  * Copyright (c) 2012-2013,2015 The Linux Foundation. All rights reserved.
   *
   * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
   *
@@ -2910,10 +2910,24 @@ eHalStatus pmcSetPreferredNetworkList
 )
 {
     tpSirPNOScanReq pRequestBuf;
-    vos_msg_t msg;
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
     tCsrRoamSession *pSession = CSR_GET_SESSION( pMac, sessionId );
     tANI_U8 ucDot11Mode;
+    tSmeCmd *pCommand;
+
+    if (NULL == pSession)
+    {
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                  "%s: pSession is NULL", __func__);
+        return eHAL_STATUS_FAILURE;
+    }
+
+    pCommand = csrGetCommandBuffer(pMac);
+    if(NULL == pCommand)
+    {
+        smsLog( pMac, LOGE, FL(" fail to get command buffer") );
+        return eHAL_STATUS_RESOURCES;
+    }
 
     VOS_TRACE( VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
                "%s: SSID = 0x%08lx%08lx%08lx%08lx%08lx%08lx%08lx%08lx, "
@@ -2936,12 +2950,7 @@ eHalStatus pmcSetPreferredNetworkList
                *((v_U32_t *) &pRequest->aNetworks[1].ssId.ssId[28]));
 
 
-    pRequestBuf = vos_mem_malloc(sizeof(tSirPNOScanReq));
-    if (NULL == pRequestBuf)
-    {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to allocate memory for PNO request", __func__);
-        return eHAL_STATUS_FAILED_ALLOC;
-    }
+    pRequestBuf = &(pCommand->u.pnoInfo);
 
     vos_mem_copy(pRequestBuf, pRequest, sizeof(tSirPNOScanReq));
 
@@ -3005,13 +3014,13 @@ eHalStatus pmcSetPreferredNetworkList
         }
     }
 
-    msg.type     = WDA_SET_PNO_REQ;
-    msg.reserved = 0;
-    msg.bodyptr  = pRequestBuf;
-    if (!VOS_IS_STATUS_SUCCESS(vos_mq_post_message(VOS_MODULE_ID_WDA, &msg)))
+    pCommand->command = eSmeCommandPnoReq;
+    pCommand->sessionId = (tANI_U8)sessionId;
+
+    if (!HAL_STATUS_SUCCESS(csrQueueSmeCommand(pMac, pCommand, TRUE)))
     {
-        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR, "%s: Not able to post WDA_SET_PNO_REQ message to WDA", __func__);
-        vos_mem_free(pRequestBuf);
+        VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+                  FL("failed to post eSmeCommandPnoReq command"));
         return eHAL_STATUS_FAILURE;
     }
 
