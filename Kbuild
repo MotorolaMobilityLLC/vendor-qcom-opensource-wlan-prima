@@ -637,6 +637,10 @@ CDEFINES += -DWCN_PRONTO
 CDEFINES += -DWCN_PRONTO_V1
 endif
 
+ifeq ($(ENABLE_DRIVER_VERBOSE),1)
+CDEFINES += -DENABLE_DRIVER_VERBOSE
+endif
+
 ifeq ($(BUILD_DEBUG_VERSION),1)
 CDEFINES +=	-DWLAN_DEBUG \
 		-DTRACE_RECORD \
@@ -753,6 +757,8 @@ endif
 
 CDEFINES += -DFEATURE_WLAN_CH_AVOID
 CDEFINES += -DWLAN_FEATURE_AP_HT40_24G
+
+CDEFINES += -DHAVE_CBC_DONE
 
 # Some kernel include files are being moved.  Check to see if
 # the old version of the files are present
