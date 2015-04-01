@@ -3526,4 +3526,5 @@ tANI_BOOLEAN smeNeighborMiddleOfRoaming(tHalHandle hHal);
 eHalStatus sme_SetRtsCtsHtVht(tHalHandle hHal, tANI_U32 set_value);
 
 
+void sme_SetDefDot11Mode(tHalHandle hHal);
 #endif //#if !defined( __SME_API_H )

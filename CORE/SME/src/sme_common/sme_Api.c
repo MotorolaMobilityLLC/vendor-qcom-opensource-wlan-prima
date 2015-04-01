@@ -11795,3 +11795,9 @@ eHalStatus sme_SetRtsCtsHtVht(tHalHandle hHal, tANI_U32 set_value)
     return eHAL_STATUS_FAILURE;
 
 }
+
+void sme_SetDefDot11Mode(tHalHandle hHal)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+    csrSetDefaultDot11Mode(pMac);
+}
