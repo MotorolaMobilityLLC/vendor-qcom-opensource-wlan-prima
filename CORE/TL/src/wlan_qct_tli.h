@@ -694,6 +694,8 @@ typedef struct
 
   WLANTL_InterfaceStatsType         interfaceStats;
 #endif
+  /* BD Rate for transmitting ARP packets */
+  v_U8_t arpRate;
 }WLANTL_STAClientType;
 
 /*---------------------------------------------------------------------------

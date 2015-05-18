@@ -1258,6 +1258,8 @@ WLANTL_RegisterSTAClient
   pClientSTA->tlPri    = WLANTL_STA_PRI_NORMAL;
   pClientSTA->wSTADesc.ucSTAId  = pwSTADescType->ucSTAId;
   pClientSTA->ptkInstalled = 0;
+  /* Use BD rate 1 for sending ARP packets by default */
+  pClientSTA->arpRate = 1;
 
   TLLOG2(VOS_TRACE( VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_INFO_HIGH,
              "WLAN TL:Registering STA Client ID: %d with UC %d and BC %d", 
@@ -7905,8 +7907,19 @@ WLANTL_STATxAuth
   if( tlMetaInfo.ucIsArp )
   {
     /*Send ARP at lowest Phy rate and through WQ5 */
-    ucTxFlag |= HAL_USE_BD_RATE_MASK;
     ucTxFlag |= HAL_USE_FW_IN_TX_PATH;
+    if (pStaClient->arpRate == 1)
+    {
+      ucTxFlag |= HAL_USE_BD_RATE_1_MASK;
+      // Toggle ARP rate
+      pStaClient->arpRate ^= 0x2;
+    }
+    else if (pStaClient->arpRate == 3)
+    {
+      ucTxFlag |= HAL_USE_BD_RATE_3_MASK;
+      // Toggle ARP rate
+      pStaClient->arpRate ^= 0x2;
+    }
   }
 
   vosStatus = (VOS_STATUS)WDA_DS_BuildTxPacketInfo( pvosGCtx, 
