@@ -8602,12 +8602,6 @@ WLANTL_STARxAuth
                             "%s: ARP Frame Rx", __func__));
        }
     }
-    else
-    {
-       /* return, don't free packet as it has been already freed by
-        * WLANTL_GetEtherType() */
-       return VOS_STATUS_SUCCESS;
-    }
 #ifdef FEATURE_WLAN_WAPI
   if ( pClientSTA->wSTADesc.ucIsWapiSta )
   {
