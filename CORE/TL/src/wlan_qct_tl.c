@@ -7906,7 +7906,6 @@ WLANTL_STATxAuth
   {
     /*Send ARP at lowest Phy rate and through WQ5 */
     ucTxFlag |= HAL_USE_BD_RATE_MASK;
-    ucTxFlag |= HAL_USE_FW_IN_TX_PATH;
   }
 
   vosStatus = (VOS_STATUS)WDA_DS_BuildTxPacketInfo( pvosGCtx, 
@@ -8187,9 +8186,6 @@ WLANTL_STARxConn
   
   if( VOS_IS_STATUS_SUCCESS(vosStatus) )
   {
-    if (WLANTL_ETHERTYPE_ARP == usEtherType)
-       TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-                         "%s: ARP Frame Rx", __func__));
 #ifdef FEATURE_WLAN_WAPI
     /* If frame is neither an EAPOL frame nor a WAI frame then we drop the frame*/
     /* TODO: Do we need a check to see if we are in WAPI mode? If not is it possible */
@@ -8481,7 +8477,9 @@ WLANTL_STARxAuth
    v_U8_t                   ucMPDUHLen;
    v_U16_t                  usActualHLen = 0;   
    v_U8_t                   ucTid;
+#ifdef FEATURE_WLAN_WAPI
    v_U16_t                  usEtherType = 0;
+#endif
    v_U16_t                  usPktLen;
    vos_pkt_t*               vosDataBuff ;
    v_PVOID_t                aucBDHeader;
@@ -8593,15 +8591,6 @@ WLANTL_STARxAuth
   }
   }
 
-    vosStatus = WLANTL_GetEtherType(aucBDHeader, vosDataBuff, ucMPDUHLen, &usEtherType);
-    if (VOS_IS_STATUS_SUCCESS(vosStatus))
-    {
-       if (WLANTL_ETHERTYPE_ARP == usEtherType)
-       {
-          TLLOGE(VOS_TRACE(VOS_MODULE_ID_TL, VOS_TRACE_LEVEL_ERROR,
-                            "%s: ARP Frame Rx", __func__));
-       }
-    }
 #ifdef FEATURE_WLAN_WAPI
   if ( pClientSTA->wSTADesc.ucIsWapiSta )
   {

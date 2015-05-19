@@ -555,7 +555,7 @@ WDI_FillTxBd
 
         if(ucTxFlag & WDI_USE_BD_RATE_MASK)
         {
-            pBd->bdRate = WDI_BDRATE_CTRL_FRAME;
+            pBd->bdRate = WDI_BDRATE_BCDATA_FRAME;
         }
 
         pBd->rmf    = WDI_RMF_DISABLED;     
