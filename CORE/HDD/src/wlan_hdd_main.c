@@ -9434,6 +9434,16 @@ int hdd_wlan_startup(struct device *dev )
       goto err_free_hdd_context;
    }
 
+   /* register for riva power on lock to platform driver
+    * Locking power early to ensure FW doesn't reset by kernel while
+    * host driver is busy initializing itself */
+   if (req_riva_power_on_lock("wlan"))
+   {
+      hddLog(VOS_TRACE_LEVEL_FATAL,"%s: req riva power on lock failed",
+                                     __func__);
+      goto err_free_hdd_context;
+   }
+
    /*Get vos context here bcoz vos_open requires it*/
    pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
 
