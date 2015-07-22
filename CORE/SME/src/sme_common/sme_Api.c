@@ -10625,7 +10625,6 @@ VOS_STATUS sme_DeleteTdlsPeerSta(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr
     if ( HAL_STATUS_SUCCESS( status ) )
     {
         status = csrTdlsDelPeerSta(hHal, sessionId, peerMac) ;
-
         sme_ReleaseGlobalLock( &pMac->sme );
     }
 
@@ -10643,6 +10642,8 @@ void sme_SetTdlsPowerSaveProhibited(tHalHandle hHal, v_BOOL_t val)
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
     pMac->isTdlsPowerSaveProhibited = val;
+    smsLog(pMac, LOG1, FL("isTdlsPowerSaveProhibited is %d"),
+                   pMac->isTdlsPowerSaveProhibited);
     return;
 }
 #endif

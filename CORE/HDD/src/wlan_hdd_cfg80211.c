@@ -15159,7 +15159,7 @@ int wlan_hdd_tdls_extctrl_deconfig_peer(hdd_adapter_t *pAdapter, u8 *peer)
 
     if ( NULL == pTdlsPeer ) {
         hddLog(VOS_TRACE_LEVEL_INFO, "%s: " MAC_ADDRESS_STR
-               " peer not exsting",
+               " peer not existing",
                __func__, MAC_ADDR_ARRAY(peer));
         return -EINVAL;
     }
@@ -15246,6 +15246,9 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
                 hddTdlsPeer_t *connPeer = NULL;
                 tANI_U8 suppChannelLen = 0;
 
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                        " %s : NL80211_TDLS_ENABLE_LINK for " MAC_ADDRESS_STR,
+                                __func__, MAC_ADDR_ARRAY(peer));
                 pTdlsPeer = wlan_hdd_tdls_find_peer(pAdapter, peer, TRUE);
                 memset(&staDesc, 0, sizeof(staDesc));
                 if ( NULL == pTdlsPeer ) {
@@ -15295,7 +15298,8 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
                                            TDLS_OFF_CHANNEL_BW_OFFSET,
                                            TDLS_CHANNEL_SWITCH_DISABLE);
                         if (ret != VOS_STATUS_SUCCESS) {
-                             hddLog(VOS_TRACE_LEVEL_ERROR, FL("Failed to send TDLS switch channel request"));
+                             hddLog(VOS_TRACE_LEVEL_ERROR,
+                                   FL("Failed to send TDLS switch channel request"));
                         }
                     }
                     else
@@ -15340,8 +15344,8 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
                         if (ret <= 0)
                         {
                             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                                      "%s: Link Establish Request Faled Status %ld",
-                                      __func__, ret);
+                                      FL("Link Establish Request Failed Status %ld"),
+                                           ret);
                             return -EINVAL;
                         }
                     }
@@ -15486,7 +15490,12 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
                 tANI_U16 numCurrTdlsPeers = 0;
                 hddTdlsPeer_t *connPeer = NULL;
 
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                        " %s : NL80211_TDLS_DISABLE_LINK for " MAC_ADDRESS_STR,
+                                __func__, MAC_ADDR_ARRAY(peer));
+
                 pTdlsPeer = wlan_hdd_tdls_find_peer(pAdapter, peer, TRUE);
+
 
                 if ( NULL == pTdlsPeer ) {
                     hddLog(VOS_TRACE_LEVEL_ERROR, "%s: " MAC_ADDRESS_STR
@@ -15587,7 +15596,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
                 if (0 != status)
                 {
                     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                               "%s: Error in TDLS Teardown", __func__);
+                               FL("Error in TDLS Teardown"));
                     return status;
                 }
                 break;
@@ -15602,7 +15611,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
                 if (0 != status)
                 {
                     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
-                               "%s: Error in TDLS Setup", __func__);
+                               FL("Error in TDLS Setup"));
                     return status;
                 }
                 break;
@@ -15610,7 +15619,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy, struct net_device 
         case NL80211_TDLS_DISCOVERY_REQ:
             /* We don't support in-driver setup/teardown/discovery */
              VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_WARN,
-                 "%s: We don't support in-driver setup/teardown/discovery "
+                 "%s: Driver doesn't support in-driver setup/teardown/discovery "
                  ,__func__);
             return -ENOTSUPP;
         default:
