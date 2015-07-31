@@ -816,6 +816,14 @@ eHalStatus sme_RoamConnectToLastProfile(tHalHandle hHal, tANI_U8 sessionId);
 eHalStatus sme_RoamDisconnect(tHalHandle hHal, tANI_U8 sessionId, eCsrRoamDisconnectReason reason);
 
 /* ---------------------------------------------------------------------------
+    \fn.sme_abortConnection
+    \brief a wrapper function to request CSR to stop from connecting a network
+    \retun void.
+---------------------------------------------------------------------------*/
+
+void sme_abortConnection(tHalHandle hHal, tANI_U8 sessionId);
+
+/* ---------------------------------------------------------------------------
     \fn sme_RoamStopBss
     \brief a wrapper function to request CSR to stop bss
     \param sessionId    - sessionId of SoftAP
@@ -2179,14 +2187,10 @@ eHalStatus sme_DeregisterMgmtFrame(tHalHandle hHal, tANI_U8 sessionId,
     \fn sme_GetFramesLog
     \brief a wrapper function that client calls to register a callback to get
            mgmt frames logged
-    \param callback - SME sends back the context using the callback
     \param flag - flag tells to clear OR send the frame log buffer
-    \param pContext - user context to be passed back along with the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
-eHalStatus sme_GetFramesLog(tHalHandle hHal,
-                             tGetFrameLogCallback callback,
-                             tANI_U8 flag, void *pContext);
+eHalStatus sme_GetFramesLog(tHalHandle hHal, tANI_U8 flag);
 /* ---------------------------------------------------------------------------
 
   \fn    sme_InitMgmtFrameLogging
@@ -3702,5 +3706,5 @@ eHalStatus sme_SetRtsCtsHtVht(tHalHandle hHal, tANI_U32 set_value);
 tANI_BOOLEAN sme_handleSetFccChannel(tHalHandle hHal,
                                       tANI_U8 fcc_constraint);
 
-
+eHalStatus sme_DeleteAllTDLSPeers(tHalHandle hHal, uint8_t sessionId);
 #endif //#if !defined( __SME_API_H )

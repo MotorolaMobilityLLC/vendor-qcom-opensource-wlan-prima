@@ -194,7 +194,6 @@ eHalStatus wlan_hdd_remain_on_channel_callback( tHalHandle hHal, void* pCtx,
             pRemainChanCtx->rem_on_chan_request,
             pRemainChanCtx->chan.center_freq,
             pRemainChanCtx->cookie);
-    cfgState->remain_on_chan_ctx = NULL;
     vos_timer_stop(&pRemainChanCtx->hdd_remain_on_chan_timer);
     vos_timer_destroy(&pRemainChanCtx->hdd_remain_on_chan_timer);
     mutex_unlock(&pHddCtx->roc_lock);
@@ -250,6 +249,7 @@ eHalStatus wlan_hdd_remain_on_channel_callback( tHalHandle hHal, void* pCtx,
     }
     vos_mem_free( pRemainChanCtx );
     pRemainChanCtx = NULL;
+    cfgState->remain_on_chan_ctx = NULL;
     if (eHAL_STATUS_SUCCESS != status)
         complete(&pAdapter->rem_on_chan_ready_event);
     complete(&pAdapter->cancel_rem_on_chan_var);
@@ -2193,8 +2193,8 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
     VOS_STATUS status;
     hdd_remain_on_chan_ctx_t* pRemainChanCtx = NULL;
 
-    hddLog(VOS_TRACE_LEVEL_INFO, "%s: Frame Type = %d Frame Length = %d",
-            __func__, frameType, nFrameLength);
+    hddLog(VOS_TRACE_LEVEL_INFO, FL("Frame Type = %d Frame Length = %d"),
+                     frameType, nFrameLength);
 
     if (NULL == pAdapter)
     {

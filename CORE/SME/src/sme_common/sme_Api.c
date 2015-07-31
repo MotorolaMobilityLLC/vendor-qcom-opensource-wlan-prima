@@ -856,6 +856,9 @@ sme_process_cmd:
                     status = pmcPrepareCommand( pMac, pmcCommand, pv, size, &pPmcCmd );
                     if( HAL_STATUS_SUCCESS( status ) && pPmcCmd )
                     {
+                        /* Set the time out to 30 sec */
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                          CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE;
                         //Force this command to wake up the chip
                         csrLLInsertHead( &pMac->sme.smeCmdActiveList, &pPmcCmd->Link, LL_ACCESS_NOLOCK );
                         MTRACE(vos_trace(VOS_MODULE_ID_SME,
@@ -885,6 +888,19 @@ sme_process_cmd:
                 {
                     // we can reuse the pCommand
 
+                    /* For roam command set timeout to 30 * 2 sec.
+                     * There are cases where we try to connect to different
+                     * APs with same SSID one by one until sucessfully conneted
+                     * and thus roam command might take more time if connection
+                     * is rejected by too many APs.
+                     */
+                    if ((eSmeCommandRoam == pCommand->command) &&
+                        (eCsrHddIssued == pCommand->u.roamCmd.roamReason))
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                         CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE * 2;
+                    else
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                             CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE;
                     // Insert the command onto the ActiveList...
                     csrLLInsertHead( &pMac->sme.smeCmdActiveList, &pCommand->Link, LL_ACCESS_NOLOCK );
 
@@ -2785,8 +2801,10 @@ v_VOID_t sme_PreClose(tHalHandle hHal)
 {
    tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
 
-   smsLog(pMac, LOGW, FL("Stopping Active CMD List Timer"));
+   if(!pMac)
+       return;
 
+   smsLog(pMac, LOGW, FL("Stopping Active CMD List Timer"));
    vos_timer_stop( pMac->sme.smeCmdActiveList.cmdTimeoutTimer );
 
 }
@@ -3496,6 +3514,29 @@ eHalStatus sme_RoamDisconnect(tHalHandle hHal, tANI_U8 sessionId, eCsrRoamDiscon
    }
 
    return (status);
+}
+
+/* ---------------------------------------------------------------------------
+    \fn.sme_abortConnection
+    \brief a wrapper function to request CSR to stop from connecting a network
+    \retun void.
+---------------------------------------------------------------------------*/
+
+void sme_abortConnection(tHalHandle hHal, tANI_U8 sessionId)
+{
+   tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
+   eHalStatus status = eHAL_STATUS_FAILURE;
+
+   status = sme_AcquireGlobalLock( &pMac->sme );
+   if ( HAL_STATUS_SUCCESS( status ) )
+   {
+      if( CSR_IS_SESSION_VALID( pMac, sessionId ) )
+      {
+          csr_abortConnection( pMac, sessionId);
+      }
+      sme_ReleaseGlobalLock( &pMac->sme );
+   }
+   return;
 }
 
 /* ---------------------------------------------------------------------------
@@ -7477,14 +7518,10 @@ eHalStatus sme_p2pSetPs(tHalHandle hHal, tP2pPsConfig * data)
     \fn sme_GetFramesLog
     \brief a wrapper function that client calls to register a callback to get
            mgmt frames logged
-    \param callback - SME sends back the context using the callback
     \param flag - flag tells to clear OR send the frame log buffer
-    \param pContext - user context to be passed back along with the callback
     \return eHalStatus
   ---------------------------------------------------------------------------*/
-eHalStatus sme_GetFramesLog(tHalHandle hHal,
-                             tGetFrameLogCallback callback,
-                             tANI_U8 flag, void *pContext)
+eHalStatus sme_GetFramesLog(tHalHandle hHal, tANI_U8 flag)
 {
    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
    eHalStatus status = eHAL_STATUS_SUCCESS;
@@ -7494,8 +7531,6 @@ eHalStatus sme_GetFramesLog(tHalHandle hHal,
    if (pGetFrameLogCmd)
    {
        pGetFrameLogCmd->command = eSmeCommandGetFrameLogRequest;
-       pGetFrameLogCmd->u.getFramelogCmd.pDevContext= pContext;
-       pGetFrameLogCmd->u.getFramelogCmd.getFramelogCallback= callback;
        pGetFrameLogCmd->u.getFramelogCmd.getFrameLogCmdFlag= flag;
 
        status = csrQueueSmeCommand(pMac, pGetFrameLogCmd, eANI_BOOLEAN_TRUE);
@@ -10590,7 +10625,6 @@ VOS_STATUS sme_DeleteTdlsPeerSta(tHalHandle hHal, tANI_U8 sessionId, tSirMacAddr
     if ( HAL_STATUS_SUCCESS( status ) )
     {
         status = csrTdlsDelPeerSta(hHal, sessionId, peerMac) ;
-
         sme_ReleaseGlobalLock( &pMac->sme );
     }
 
@@ -10608,6 +10642,8 @@ void sme_SetTdlsPowerSaveProhibited(tHalHandle hHal, v_BOOL_t val)
     tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
     pMac->isTdlsPowerSaveProhibited = val;
+    smsLog(pMac, LOG1, FL("isTdlsPowerSaveProhibited is %d"),
+                   pMac->isTdlsPowerSaveProhibited);
     return;
 }
 #endif
@@ -11392,6 +11428,24 @@ eHalStatus sme_StopBatchScanInd
 
 #endif
 
+void activeListCmdTimeoutHandle(void *userData)
+{
+    /* Return if no cmd pending in active list as
+     * in this case we should not be here.
+     */
+    if ((NULL == userData) ||
+        (0 == csrLLCount(&((tpAniSirGlobal) userData)->sme.smeCmdActiveList)))
+        return;
+    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
+        "%s: Active List command timeout Cmd List Count %d", __func__,
+        csrLLCount(&((tpAniSirGlobal) userData)->sme.smeCmdActiveList) );
+    smeGetCommandQStatus((tHalHandle) userData);
+
+    if (!(vos_isLoadUnloadInProgress() ||
+        vos_is_logp_in_progress(VOS_MODULE_ID_SME, NULL)))
+       VOS_BUG(0);
+}
+
 #ifdef FEATURE_WLAN_CH_AVOID
 /* ---------------------------------------------------------------------------
     \fn sme_AddChAvoidCallback
@@ -11427,17 +11481,6 @@ eHalStatus sme_AddChAvoidCallback
     return(status);
 }
 #endif /* FEATURE_WLAN_CH_AVOID */
-
-void activeListCmdTimeoutHandle(void *userData)
-{
-    if (NULL == userData)
-        return;
-    VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
-        "%s: Active List command timeout Cmd List Count %d", __func__,
-    csrLLCount(&((tpAniSirGlobal) userData)->sme.smeCmdActiveList) );
-    smeGetCommandQStatus((tHalHandle) userData);
-    VOS_BUG(0);
-}
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
@@ -12657,5 +12700,27 @@ tANI_BOOLEAN sme_handleSetFccChannel(tHalHandle hHal, tANI_U8 fcc_constraint)
 
         sme_ReleaseGlobalLock(&pMac->sme);
 
+    return status;
+}
+
+eHalStatus sme_DeleteAllTDLSPeers(tHalHandle hHal, uint8_t sessionId)
+{
+    tSirDelAllTdlsPeers *pMsg;
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, sessionId);
+
+    pMsg = vos_mem_malloc(sizeof(tSirDelAllTdlsPeers));
+    if (NULL == pMsg)
+    {
+        smsLog(pMac, LOGE, FL("memory alloc failed"));
+        return eHAL_STATUS_FAILURE;
+    }
+    vos_mem_set(pMsg, sizeof( tSirDelAllTdlsPeers ), 0);
+    pMsg->mesgType = pal_cpu_to_be16((tANI_U16)eWNI_SME_DEL_ALL_TDLS_PEERS);
+    pMsg->mesgLen = pal_cpu_to_be16((tANI_U16)sizeof( tSirDelAllTdlsPeers ));
+    vos_mem_copy(pMsg->bssid, pSession->connectedProfile.bssid,
+                 sizeof(tSirMacAddr));
+    status = palSendMBMessage( pMac->hHdd, pMsg );
     return status;
 }

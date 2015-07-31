@@ -877,11 +877,13 @@ VOS_STATUS vos_start( v_CONTEXT_t vosContext )
   if ( vStatus != VOS_STATUS_SUCCESS )
   {
      VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
-                 "%s: Failed to start WDA - WDA_shutdown needed", __func__);
+                 "%s: Failed to start WDA - WDA_shutdown needed %d ",
+                   __func__, vStatus);
      if ( vStatus == VOS_STATUS_E_TIMEOUT )
-      {
+     {
          WDA_setNeedShutdown(vosContext);
-      }
+     }
+     VOS_ASSERT(0);
      return VOS_STATUS_E_FAILURE;
   }
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
@@ -2649,6 +2651,33 @@ void vos_set_multicast_logging(uint8_t value)
 v_U8_t vos_is_multicast_logging(void)
 {
    return vos_multicast_logging;
+}
+
+/**
+ * vos_isLoadUnloadInProgress()
+ *
+ * Return TRUE if load/unload is in progress.
+ *
+ */
+v_BOOL_t vos_isLoadUnloadInProgress(void)
+{
+    hdd_context_t *pHddCtx = NULL;
+    v_CONTEXT_t pVosContext = vos_get_global_context(VOS_MODULE_ID_SYS, NULL);
+
+    if(!pVosContext)
+    {
+       hddLog(VOS_TRACE_LEVEL_FATAL,"%s: Global VOS context is Null", __func__);
+       return FALSE;
+    }
+
+    pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
+    if(!pHddCtx) {
+       VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_FATAL,
+                "%s: HDD context is Null", __func__);
+       return FALSE;
+    }
+
+    return ( 0 != pHddCtx->isLoadUnloadInProgress);
 }
 
 /**

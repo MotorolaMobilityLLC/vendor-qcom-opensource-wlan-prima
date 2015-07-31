@@ -601,6 +601,11 @@ VOS_STATUS WDA_start(v_PVOID_t pVosContext)
       {
          wdaContext->wdaTimersCreated = VOS_TRUE;
       }
+      else
+      {
+          VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+                    FL("wda create timers failed"));
+      }
    }
    else
    {
@@ -2201,10 +2206,38 @@ VOS_STATUS WDA_prepareConfigTLV(v_PVOID_t pVosContext,
                "Failed to get value for WNI_CFG_BTC_STATIC_OPP_WLAN_IDLE_BT_LEN");
       goto handle_failure;
    }
-
    tlvStruct = (tHalCfg *)( (tANI_U8 *) tlvStruct
                            + sizeof(tHalCfg) + tlvStruct->length) ;
 
+   /* QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT */
+   tlvStruct->type = QWLAN_HAL_CFG_LINK_FAIL_TIMEOUT ;
+   tlvStruct->length = sizeof(tANI_U32);
+   configDataValue = (tANI_U32 *)(tlvStruct + 1);
+
+   if (wlan_cfgGetInt(pMac, WNI_CFG_LINK_FAIL_TIMEOUT,
+                                            configDataValue ) != eSIR_SUCCESS)
+   {
+      VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+               "Failed to get value for WNI_CFG_LINK_FAIL_TIMEOUT");
+      goto handle_failure;
+   }
+   tlvStruct = (tHalCfg *)( (tANI_U8 *) tlvStruct
+                           + sizeof(tHalCfg) + tlvStruct->length) ;
+
+   /* QWLAN_HAL_CFG_LINK_FAIL_TX_CNT */
+   tlvStruct->type = QWLAN_HAL_CFG_LINK_FAIL_TX_CNT ;
+   tlvStruct->length = sizeof(tANI_U32);
+   configDataValue = (tANI_U32 *)(tlvStruct + 1);
+
+   if (wlan_cfgGetInt(pMac, WNI_CFG_LINK_FAIL_TX_CNT,
+                                            configDataValue ) != eSIR_SUCCESS)
+   {
+      VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+               "Failed to get value for WNI_CFG_LINK_FAIL_TX_CNT");
+      goto handle_failure;
+   }
+   tlvStruct = (tHalCfg *)( (tANI_U8 *) tlvStruct
+                           + sizeof(tHalCfg) + tlvStruct->length) ;
 
    wdiStartParams->usConfigBufferLen = (tANI_U8 *)tlvStruct - tlvStructStart ;
 #ifdef WLAN_DEBUG
@@ -5224,21 +5257,10 @@ void WDA_GetFrameLogRspCallback(WDI_GetFrameLogRspParamType* wdiRsp,
       return;
    }
 
-   pGetFrameLogReqParams->rspStatus = wdiRsp->wdiStatus;
    if (wdiRsp->wdiStatus != WDI_STATUS_SUCCESS) {
       VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
-              "%s:GetFrameLog with rsp status %d", __func__, wdiRsp->wdiStatus);
-   }
-
-   if(pGetFrameLogReqParams->getFramelogCallback)
-   {
-      pGetFrameLogReqParams->getFramelogCallback(
-                                       pGetFrameLogReqParams->pDevContext);
-   }
-   else
-   {
-      VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
-                  "%s: pGetFrameLogReqParams callback is NULL", __func__);
+              "%s:GetFrameLog with rsp status %d flag %d", __func__,
+               wdiRsp->wdiStatus,pGetFrameLogReqParams->getFrameLogCmdFlag);
    }
 
    /* free WDI command buffer only */
@@ -13029,7 +13051,7 @@ VOS_STATUS WDA_TxPacket(tWDA_CbContext *pWDA,
        if( NULL != pWDA->pAckTxCbFunc )
        {
            /* Already TxComp is active no need to active again */
-           VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR, 
+           VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
                    "There is already one request pending for tx complete");
            pWDA->pAckTxCbFunc( pMac, &txBdStatus);
            pWDA->pAckTxCbFunc = NULL;
@@ -13042,7 +13064,7 @@ VOS_STATUS WDA_TxPacket(tWDA_CbContext *pWDA,
            }
            else
            {
-               VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
+               VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
                        "Tx Complete timeout Timer Stop Success ");
            }
        }
@@ -17241,6 +17263,8 @@ VOS_STATUS WDA_ProcessTxControlInd(tWDA_CbContext *pWDA,
 
 void WDA_FWLoggingDXEdoneInd(void)
 {
+   VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
+      " ----> %s", __func__ );
    WDI_FWLoggingDXEdoneInd(NULL);
 }
 
@@ -17315,16 +17339,18 @@ VOS_STATUS WDA_shutdown(v_PVOID_t pVosContext, wpt_boolean closeTransport)
       VOS_ASSERT(0);
    }
 
-   if ( (eDRIVER_TYPE_MFG != pWDA->driverMode) &&
-        (VOS_TRUE == pWDA->wdaTimersCreated))
+   if (eDRIVER_TYPE_MFG != pWDA->driverMode)
    {
-      wdaDestroyTimers(pWDA);
-      pWDA->wdaTimersCreated = VOS_FALSE;
+       if(VOS_TRUE == pWDA->wdaTimersCreated)
+       {
+          wdaDestroyTimers(pWDA);
+          pWDA->wdaTimersCreated = VOS_FALSE;
+       }
    }
    else
    {
       vos_event_destroy(&pWDA->ftmStopDoneEvent);
-  }
+   }
 
    /* call WDI shutdown */
    wdiStatus = WDI_Shutdown(closeTransport);

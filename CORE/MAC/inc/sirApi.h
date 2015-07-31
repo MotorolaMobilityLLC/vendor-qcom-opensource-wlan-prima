@@ -3728,10 +3728,7 @@ typedef struct sAniGetFrameLogReq
 {
     tANI_U16               msgType;
     tANI_U16               msgLen;
-    tGetFrameLogCallback   getFramelogCallback;
-    void                   *pDevContext;       //device context
     tANI_U8                getFrameLogCmdFlag;
-    tANI_U32               rspStatus;
 } tAniGetFrameLogReq,      *tpAniGetFrameLogReq;
 
 
@@ -5579,4 +5576,11 @@ typedef struct
     tANI_U16    msgLen;     // length of the entire request
     tANI_U8     SetTdls2040BSSCoex; //enabled or disabled
 } tAniSetTdls2040BSSCoex, *tpAniSetTdls2040BSSCoex;
+
+typedef struct
+{
+    tANI_U16   mesgType;
+    tANI_U16   mesgLen;
+    tSirMacAddr bssid;
+}tSirDelAllTdlsPeers, *ptSirDelAllTdlsPeers;
 #endif /* __SIR_API_H */

@@ -101,9 +101,8 @@
 #define TDLS_INIT_DONE         (6)
 
 /** Maximum time(ms)to wait for disconnect to complete **/
-#define WLAN_WAIT_TIME_DISCONNECT  2000
+#define WLAN_WAIT_TIME_DISCONNECT  5000
 #define WLAN_WAIT_TIME_STATS       800
-#define WLAN_WAIT_TIME_FRAME_LOG   2000
 #define WLAN_WAIT_TIME_POWER       800
 #define WLAN_WAIT_TIME_COUNTRY     1000
 #define WLAN_WAIT_TIME_CHANNEL_UPDATE   600
@@ -1670,4 +1669,5 @@ VOS_STATUS hdd_sta_id_hash_remove_entry(hdd_adapter_t *pAdapter,
                                        v_U8_t sta_id, v_MACADDR_t *mac_addr);
 int hdd_sta_id_find_from_mac_addr(hdd_adapter_t *pAdapter,
                                   v_MACADDR_t *mac_addr_in);
+void hdd_init_frame_logging(hdd_context_t *pHddCtx);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

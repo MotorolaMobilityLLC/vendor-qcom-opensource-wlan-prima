@@ -505,6 +505,7 @@ void hdd_SendFTEvent(hdd_adapter_t *pAdapter)
     if (auth_resp_len == 0)
     {
         hddLog(LOGE, "%s: AuthRsp FTIES is of length 0", __func__);
+        kfree(buff);
         return;
     }
 
@@ -1068,6 +1069,10 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
                 }
             }
 #endif
+               if ((roamStatus == eCSR_ROAM_LOSTLINK) &&
+                    !pRoamInfo->reasonCode)
+                   wlan_hdd_get_frame_logs(pAdapter,
+                                WLAN_HDD_GET_FRAME_LOG_CMD_SEND_AND_CLEAR);
             /*Only send indication to kernel if not initiated by kernel*/
             if ( sendDisconInd )
             {
@@ -1892,7 +1897,8 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
                     MAC_ADDR_ARRAY(pWextState->req_bssId),
                     roamResult, roamStatus);
 
-        wlan_hdd_get_frame_logs(pAdapter,
+        if ( eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus)
+            wlan_hdd_get_frame_logs(pAdapter,
                                 WLAN_HDD_GET_FRAME_LOG_CMD_SEND_AND_CLEAR);
 
         /* Set connection state to eConnectionState_NotConnected only when CSR
@@ -2831,7 +2837,7 @@ VOS_STATUS hdd_roamRegisterTDLSSTA( hdd_adapter_t *pAdapter,
     return( vosStatus );
 }
 
-static VOS_STATUS hdd_roamDeregisterTDLSSTA( hdd_adapter_t *pAdapter, tANI_U8 staId )
+VOS_STATUS hdd_roamDeregisterTDLSSTA( hdd_adapter_t *pAdapter, tANI_U8 staId )
 {
     VOS_STATUS vosStatus;
     vosStatus = WLANTL_ClearSTAClient( (WLAN_HDD_GET_CTX(pAdapter))->pvosContext, staId );
@@ -3300,7 +3306,6 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
                        before the ENTER_BMPS_REQ ensures Listen Interval is
                        regained back to LI * Modulated DTIM */
                     hdd_set_pwrparams(pHddCtx);
-                    pHddStaCtx->hdd_ReassocScenario = VOS_FALSE;
 
                     /* At this point, device should not be in BMPS;
                        if due to unexpected scenario, if we are in BMPS,
@@ -3315,6 +3320,21 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
                                          eSME_FULL_PWR_NEEDED_BY_HDD);
                     }
                 }
+
+                if ((pHddCtx) &&
+                     FULL_POWER == pmcGetPmcState(pHddCtx->hHal) &&
+                     VOS_TRUE == pHddStaCtx->hdd_ReassocScenario)
+                {
+                    hddLog( LOG1, FL("Device in full power."
+                           "Stop and start traffic timer for roaming"));
+                    pmcStopTrafficTimer(pHddCtx->hHal);
+                    if (pmcStartTrafficTimer(pHddCtx->hHal,
+                        TRAFFIC_TIMER_ROAMING) != eHAL_STATUS_SUCCESS)
+                    {
+                       hddLog(LOGP, FL("Cannot start traffic timer"));
+                    }
+                }
+
                 halStatus = hdd_RoamSetKeyCompleteHandler( pAdapter, pRoamInfo, roamId, roamStatus, roamResult );
                 pHddStaCtx->hdd_ReassocScenario = FALSE;
             }

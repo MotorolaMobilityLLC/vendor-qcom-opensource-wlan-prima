@@ -1964,7 +1964,7 @@ static wpt_status dxeRXFrameSingleBufferAlloc
    currentPalPacketBuffer->BDLength = 0;
 
    if (channelEntry->channelType == WDTS_CHANNEL_RX_FW_LOG)
-      wpalPacketRawTrimHead(currentCtrlBlock->xfrFrame, WLANDXE_H2H_HEADER_OFFSET);
+      wpalPacketRawTrimHead(currentCtrlBlock->xfrFrame, WLANDXE_NL_HEADER_SZ);
 
    status = wpalLockPacketForTransfer(currentPalPacketBuffer);
 
@@ -2122,8 +2122,8 @@ static wpt_uint32 dxeRXLogRefillRing
 
       currentDesc = currentCtrlBlk->linkedDesc;
       currentDesc->descCtrl.ctrl = channelEntry->extraConfig.cw_ctrl_read;
-      xfrSize = WLANDXE_DEFAULT_RX_OS_BUFFER_SIZE > bufferLen ?
-                   bufferLen : WLANDXE_DEFAULT_RX_OS_BUFFER_SIZE;
+      xfrSize = WLANDXE_FW_LOGGING_XFSIZE > bufferLen ?
+                   bufferLen : WLANDXE_FW_LOGGING_XFSIZE;
       currentDesc->xfrSize = xfrSize;
       allocatedLen += xfrSize;
       bufferLen -= xfrSize;
@@ -3352,6 +3352,7 @@ static wpt_status dxeTXPushFrame
                   "SMSM_ret LO=%d HI=%d",
                   tempDxeCtrlBlk->dxeChannel[WDTS_CHANNEL_TX_LOW_PRI].numRsvdDesc,
                   tempDxeCtrlBlk->dxeChannel[WDTS_CHANNEL_TX_HIGH_PRI].numRsvdDesc );
+         dxeNotifySmsm(eWLAN_PAL_FALSE, eWLAN_PAL_TRUE);
          dxeNotifySmsm(eWLAN_PAL_TRUE, eWLAN_PAL_FALSE);
          tempDxeCtrlBlk->smsmToggled = eWLAN_PAL_TRUE;
       }
@@ -4183,7 +4184,8 @@ void dxeTXCompleteProcessing
           * Then when push frame, no SMSM toggle happen
           * To avoid permanent TX stall, SMSM toggle is needed at here
           * With this toggle, host should gaurantee SMSM state should be changed */
-         dxeNotifySmsm(eWLAN_PAL_TRUE, dxeCtxt->txRingsEmpty);
+         dxeNotifySmsm(eWLAN_PAL_FALSE, eWLAN_PAL_TRUE);
+         dxeNotifySmsm(eWLAN_PAL_TRUE, eWLAN_PAL_FALSE);
       }
    }
    
