@@ -2727,8 +2727,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                             pAdapter->sessionId, roamRssiDiff));
            len = scnprintf(extra, sizeof(extra), "%s %d",
                    command, roamRssiDiff);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -2748,8 +2748,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                             TRACE_CODE_HDD_GETBAND_IOCTL,
                             pAdapter->sessionId, band));
            len = scnprintf(extra, sizeof(extra), "%s %d", command, band);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -7243,10 +7243,13 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 
    ENTER();
 
-   status = hdd_sta_id_hash_detach(pAdapter);
-   if (status != VOS_STATUS_SUCCESS)
-       hddLog(VOS_TRACE_LEVEL_ERROR,
-                 FL("sta id hash detach failed"));
+   if ( VOS_TRUE == bCloseSession )
+   {
+      status = hdd_sta_id_hash_detach(pAdapter);
+      if (status != VOS_STATUS_SUCCESS)
+          hddLog(VOS_TRACE_LEVEL_ERROR,
+                    FL("sta id hash detach failed"));
+   }
 
    pScanInfo =  &pHddCtx->scan_info;
    switch(pAdapter->device_mode)
@@ -11730,7 +11733,7 @@ VOS_STATUS hdd_sta_id_hash_add_entry(hdd_adapter_t *pAdapter,
     spin_lock_bh( &pAdapter->sta_hash_lock);
     if (pAdapter->is_sta_id_hash_initialized != VOS_TRUE) {
         spin_unlock_bh( &pAdapter->sta_hash_lock);
-        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                   "%s: hash is not initialized for session id %d",
                   __func__, pAdapter->sessionId);
         return VOS_STATUS_E_FAILURE;

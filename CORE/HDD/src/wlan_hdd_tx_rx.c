@@ -1152,6 +1152,10 @@ void __hdd_tx_timeout(struct net_device *dev)
    //update last jiffies after the check
    pAdapter->hdd_stats.hddTxRxStats.jiffiesLastTxTimeOut = jiffies;
 
+   if (WLANTL_IsEAPOLPending(pHddCtx->pvosContext) == VOS_STATUS_SUCCESS) {
+      pAdapter->hdd_stats.hddTxRxStats.continuousTxTimeoutCount = 0;
+      goto print_log;
+   }
    if (pAdapter->hdd_stats.hddTxRxStats.continuousTxTimeoutCount ==
           HDD_TX_STALL_RECOVERY_THRESHOLD)
    {
@@ -1197,6 +1201,7 @@ void __hdd_tx_timeout(struct net_device *dev)
       }
    }
 
+print_log:
    /* If Tx stalled for a long time then *hdd_tx_timeout* is called
     * every 5sec. The TL debug spits out a lot of information on the
     * serial console, if it is called every time *hdd_tx_timeout* is
@@ -2042,15 +2047,9 @@ VOS_STATUS hdd_tx_fetch_packet_cbk( v_VOID_t *vosContext,
    }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
+   if (vos_is_macaddr_multicast((v_MACADDR_t*)skb->data))
    {
-       v_MACADDR_t *pDestMacAddress = (v_MACADDR_t*)skb->data;
-       /* vos_is_macaddr_group expects data in v_MACADDR_t format
-        */
-       if (vos_is_macaddr_group(pDestMacAddress))
-       {
-            pAdapter->hdd_stats.hddTxRxStats.txMcast[actualAC]++;
-       }
-
+        pAdapter->hdd_stats.hddTxRxStats.txMcast[actualAC]++;
    }
 
 #endif

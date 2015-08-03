@@ -127,7 +127,6 @@ limSetChannel(tpAniSirGlobal pMac, tANI_U8 channel, tANI_U8 secChannelOffset, tP
 void
 limProcessMlmReqMessages(tpAniSirGlobal pMac, tpSirMsgQ Msg)
 {
-    MTRACE(macTraceMsgRx(pMac, NO_SESSION, Msg->type));
     switch (Msg->type)
     {
         case LIM_MLM_START_REQ:             limProcessMlmStartReq(pMac, Msg->bodyptr);   break;
@@ -495,9 +494,6 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
              */ 
             pMac->lim.limTimers.gLimMinChannelTimer.sessionId = sessionId;
 #endif            
-            
-            MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, NO_SESSION, eLIM_MIN_CHANNEL_TIMER));
-
             if (tx_timer_activate(&pMac->lim.limTimers.gLimMinChannelTimer) != TX_SUCCESS)
             {
                 limLog(pMac, LOGP, FL("could not start min channel timer"));
@@ -515,7 +511,6 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
 #endif
               //No Need to start Min channel timer. Start Max Channel timer.
               limDeactivateAndChangeTimer(pMac, eLIM_MAX_CHANNEL_TIMER);
-              MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, pMac->lim.limTimers.gLimMaxChannelTimer.sessionId, eLIM_MAX_CHANNEL_TIMER));
               if (tx_timer_activate(&pMac->lim.limTimers.gLimMaxChannelTimer)
                     == TX_TIMER_ERROR)
               {
@@ -539,7 +534,6 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
              return;
         }
         periodicScanTimer->sessionId = channelNum;
-        MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, periodicScanTimer->sessionId, eLIM_PERIODIC_PROBE_REQ_TIMER));
     }
     else
     {
@@ -547,7 +541,6 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
         limLog(pMac, LOG1, FL("START PASSIVE Scan chan %d"), channelNum);
 
         /// Passive Scanning. Activate maxChannelTimer
-        MTRACE(macTrace(pMac, TRACE_CODE_TIMER_DEACTIVATE, NO_SESSION, eLIM_MAX_CHANNEL_TIMER));
         if (tx_timer_deactivate(&pMac->lim.limTimers.gLimMaxChannelTimer)
                                       != TX_SUCCESS)
         {
@@ -596,7 +589,6 @@ void limContinuePostChannelScan(tpAniSirGlobal pMac)
 #endif
             //Pick the longer stay time
             val = (val > val1) ? val : val1;
-            MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, NO_SESSION, eLIM_MAX_CHANNEL_TIMER));
             if (tx_timer_change(&pMac->lim.limTimers.gLimMaxChannelTimer,
                         val, 0) != TX_SUCCESS)
             {
@@ -2869,6 +2861,9 @@ limProcessMlmDisassocReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_
     tLimMlmDisassocCnf       mlmDisassocCnf;
     tpPESession              psessionEntry;
     extern tANI_BOOLEAN     sendDisassocFrame;
+    tSirSmeDisassocRsp      *pSirSmeDisassocRsp;
+    tANI_U32                *pMsg;
+    tANI_U8                 *pBuf;
 
     if(eHAL_STATUS_SUCCESS != suspendStatus)
     {
@@ -2967,11 +2962,37 @@ limProcessMlmDisassocReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_
             limLog(pMac, LOGE, FL("Sta MlmState : %d"),
                     pStaDs->mlmStaContext.mlmState);
 
-        /// Prepare and Send LIM_MLM_DISASSOC_CNF
+        /*
+         * Disassociation response due to
+         * host triggered disassociation
+         */
 
-        mlmDisassocCnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
+         pSirSmeDisassocRsp = vos_mem_malloc(sizeof(tSirSmeDisassocRsp));
+         if ( NULL == pSirSmeDisassocRsp )
+         {
+            // Log error
+             limLog(pMac, LOGP,
+                FL("call to AllocateMemory failed for eWNI_SME_DISASSOC_RSP"));
+             return;
+         }
+         limLog(pMac, LOG1, FL("send eWNI_SME_DISASSOC_RSP with "
+                "retCode: %d for "MAC_ADDRESS_STR),eSIR_SME_DEAUTH_STATUS,
+                 MAC_ADDR_ARRAY(pMlmDisassocReq->peerMacAddr));
+         pSirSmeDisassocRsp->messageType = eWNI_SME_DISASSOC_RSP;
+         pSirSmeDisassocRsp->length      = sizeof(tSirSmeDisassocRsp);
+         pSirSmeDisassocRsp->sessionId = pMlmDisassocReq->sessionId;
+         pSirSmeDisassocRsp->transactionId = 0;
+         pSirSmeDisassocRsp->statusCode = eSIR_SME_DEAUTH_STATUS;
 
-        goto end;
+         pBuf  = (tANI_U8 *) pSirSmeDisassocRsp->peerMacAddr;
+         vos_mem_copy( pBuf, pMlmDisassocReq->peerMacAddr, sizeof(tSirMacAddr));
+
+         pMsg = (tANI_U32*) pSirSmeDisassocRsp;
+
+         limSendSmeDisassocDeauthNtf( pMac, eHAL_STATUS_SUCCESS,
+                                                (tANI_U32*) pMsg );
+         return;
+
     }
 
     //pStaDs->mlmStaContext.rxPurgeReq = 1;
@@ -3182,6 +3203,9 @@ limProcessMlmDeauthReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_U3
     tLimMlmDeauthReq        *pMlmDeauthReq;
     tLimMlmDeauthCnf        mlmDeauthCnf;
     tpPESession             psessionEntry;
+    tSirSmeDeauthRsp        *pSirSmeDeauthRsp;
+    tANI_U8                 *pBuf;
+    tANI_U32                *pMsg;
 
 
     if(eHAL_STATUS_SUCCESS != suspendStatus)
@@ -3363,11 +3387,38 @@ limProcessMlmDeauthReqNtf(tpAniSirGlobal pMac, eHalStatus suspendStatus, tANI_U3
            FL("received MLM_DEAUTH_REQ for STA that either has no context or in some transit state, Addr="
            MAC_ADDRESS_STR),MAC_ADDR_ARRAY(pMlmDeauthReq->peerMacAddr));)
 
-        /// Prepare and Send LIM_MLM_DEAUTH_CNF
+        /*
+         * Deauthentication response to host triggered
+         * deauthentication.
+         */
+        pSirSmeDeauthRsp = vos_mem_malloc(sizeof(tSirSmeDeauthRsp));
+        if ( NULL == pSirSmeDeauthRsp )
+        {
+            // Log error
+            limLog(pMac, LOGP,
+                   FL("call to AllocateMemory failed for eWNI_SME_DEAUTH_RSP"));
 
-        mlmDeauthCnf.resultCode    = eSIR_SME_INVALID_PARAMETERS;
+            return;
+        }
+        limLog(pMac, LOG1, FL("send eWNI_SME_DEAUTH_RSP with "
+               "retCode: %d for"MAC_ADDRESS_STR),eSIR_SME_DEAUTH_STATUS,
+               MAC_ADDR_ARRAY(pMlmDeauthReq->peerMacAddr));
+        pSirSmeDeauthRsp->messageType = eWNI_SME_DEAUTH_RSP;
+        pSirSmeDeauthRsp->length  = sizeof(tSirSmeDeauthRsp);
+        pSirSmeDeauthRsp->statusCode = eSIR_SME_DEAUTH_STATUS;
+        pSirSmeDeauthRsp->sessionId = pMlmDeauthReq->sessionId;
+        pSirSmeDeauthRsp->transactionId = 0;
 
-        goto end;
+        pBuf  = (tANI_U8 *) pSirSmeDeauthRsp->peerMacAddr;
+        vos_mem_copy( pBuf, pMlmDeauthReq->peerMacAddr, sizeof(tSirMacAddr));
+
+        pMsg = (tANI_U32*)pSirSmeDeauthRsp;
+
+        limSendSmeDisassocDeauthNtf( pMac, eHAL_STATUS_SUCCESS,
+                                            (tANI_U32*) pMsg );
+
+        return;
+
     }
 
     //pStaDs->mlmStaContext.rxPurgeReq     = 1;
@@ -4064,7 +4115,6 @@ limProcessPeriodicProbeReqTimer(tpAniSirGlobal pMac)
         } while (i < pLimMlmScanReq->numSsid);
 
         /* Activate timer again */
-        MTRACE(macTrace(pMac, TRACE_CODE_TIMER_ACTIVATE, pPeriodicProbeReqTimer->sessionId, eLIM_PERIODIC_PROBE_REQ_TIMER));
         if (tx_timer_activate(pPeriodicProbeReqTimer) != TX_SUCCESS)
         {
              limLog(pMac, LOGP, FL("could not start periodic probe"

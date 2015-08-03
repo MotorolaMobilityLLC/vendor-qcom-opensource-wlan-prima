@@ -53,6 +53,7 @@
 #include "wlan_nlink_common.h"
 #include "wlan_btc_svc.h"
 #include "wlan_hdd_power.h"
+#include "wlan_hdd_trace.h"
 #include <linux/ieee80211.h>
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
@@ -3121,6 +3122,9 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
        return eHAL_STATUS_FAILURE;
     }
 
+
+    MTRACE(vos_trace(VOS_MODULE_ID_HDD, TRACE_CODE_HDD_RX_SME_MSG,
+                               pAdapter->sessionId, roamStatus));
     switch( roamStatus )
     {
         case eCSR_ROAM_SESSION_OPENED:
@@ -3322,8 +3326,9 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
                 }
 
                 if ((pHddCtx) &&
-                     FULL_POWER == pmcGetPmcState(pHddCtx->hHal) &&
-                     VOS_TRUE == pHddStaCtx->hdd_ReassocScenario)
+                    (FULL_POWER == pmcGetPmcState(pHddCtx->hHal)) &&
+                    (VOS_TRUE == pHddStaCtx->hdd_ReassocScenario) &&
+                    (eCSR_ROAM_RESULT_NONE == roamResult))
                 {
                     hddLog( LOG1, FL("Device in full power."
                            "Stop and start traffic timer for roaming"));
@@ -3336,7 +3341,8 @@ eHalStatus hdd_smeRoamCallback( void *pContext, tCsrRoamInfo *pRoamInfo, tANI_U3
                 }
 
                 halStatus = hdd_RoamSetKeyCompleteHandler( pAdapter, pRoamInfo, roamId, roamStatus, roamResult );
-                pHddStaCtx->hdd_ReassocScenario = FALSE;
+                if (eCSR_ROAM_RESULT_NONE == roamResult)
+                    pHddStaCtx->hdd_ReassocScenario = FALSE;
             }
             break;
 #ifdef WLAN_FEATURE_VOWIFI_11R

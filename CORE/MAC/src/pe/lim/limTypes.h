@@ -51,6 +51,7 @@
 
 #include "limApi.h"
 #include "limDebug.h"
+#include "limTrace.h"
 #include "limSendSmeRspMessages.h"
 #include "sysGlobal.h"
 #include "dphGlobal.h"
@@ -697,6 +698,9 @@ void limSendAssocRspMgmtFrame(tpAniSirGlobal, tANI_U16, tANI_U16, tSirMacAddr, t
 void limSendNullDataFrame(tpAniSirGlobal, tpDphHashNode);
 void limSendDisassocMgmtFrame(tpAniSirGlobal, tANI_U16, tSirMacAddr, tpPESession, tANI_BOOLEAN waitForAck);
 void limSendDeauthMgmtFrame(tpAniSirGlobal, tANI_U16, tSirMacAddr, tpPESession, tANI_BOOLEAN waitForAck);
+void limSendSmeDisassocDeauthNtf( tpAniSirGlobal pMac,
+                                eHalStatus status, tANI_U32 *pCtx );
+
 
 void limContinueChannelScan(tpAniSirGlobal);
 tSirResultCodes limMlmAddBss(tpAniSirGlobal, tLimMlmStartReq *,tpPESession psessionEntry);
@@ -907,7 +911,10 @@ limPostSmeMessage(tpAniSirGlobal pMac, tANI_U32 msgType, tANI_U32 *pMsgBuf)
     msg.bodyptr = pMsgBuf;
     msg.bodyval = 0;
     if (msgType > eWNI_SME_MSG_TYPES_BEGIN)
+    {
+        MTRACE(macTrace(pMac, TRACE_CODE_TX_SME_MSG, NO_SESSION, msg.type));
         limProcessSmeReqMessages(pMac, &msg);
+    }
     else
         limProcessMlmRspMessages(pMac, msgType, pMsgBuf);
 } /*** end limPostSmeMessage() ***/
@@ -950,6 +957,7 @@ limPostMlmMessage(tpAniSirGlobal pMac, tANI_U32 msgType, tANI_U32 *pMsgBuf)
     msg.type = (tANI_U16) msgType;
     msg.bodyptr = pMsgBuf;
     msg.bodyval = 0;
+    MTRACE(macTraceMsgRx(pMac, NO_SESSION, msg.type));
     limProcessMlmReqMessages(pMac, &msg);
 } /*** end limPostMlmMessage() ***/
 
