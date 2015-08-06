@@ -2443,7 +2443,6 @@ void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
     hdd_adapter_t *pAdapter;
     tdlsCtx_t *pHddTdlsCtx;
 
-    ENTER();
     VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                "%s mode %d", __func__, (int)tdls_mode);
 
@@ -2491,7 +2490,6 @@ void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
 
     mutex_unlock(&pHddCtx->tdls_lock);
 
-    EXIT();
 }
 
 static
