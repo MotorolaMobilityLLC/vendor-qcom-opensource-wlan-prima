@@ -517,7 +517,6 @@ static tANI_U32 limPrepareTdlsFrameHeader(tpAniSirGlobal pMac, tANI_U8* pFrame,
  eHalStatus limMgmtTXComplete(tpAniSirGlobal pMac,
                                    void *pData)
 {
-    tpPESession psessionEntry = NULL ;
     tANI_U32 txCompleteSuccess = 0;
     tpSirTxBdStatus pTxBdStatus = NULL;
 
@@ -542,14 +541,8 @@ static tANI_U32 limPrepareTdlsFrameHeader(tpAniSirGlobal pMac, tANI_U8* pFrame,
 
     if (0xff != pMac->lim.mgmtFrameSessionId)
     {
-        psessionEntry = peFindSessionBySessionId(pMac, pMac->lim.mgmtFrameSessionId);
-        if (NULL == psessionEntry)
-        {
-            limLog(pMac, LOGE, FL("sessionID %d is not found"),
-                               pMac->lim.mgmtFrameSessionId);
-            return eHAL_STATUS_FAILURE;
-        }
-        limSendSmeMgmtTXCompletion(pMac, psessionEntry, txCompleteSuccess);
+        limSendSmeMgmtTXCompletion(pMac, pMac->lim.mgmtFrameSessionId,
+                                   txCompleteSuccess);
         pMac->lim.mgmtFrameSessionId = 0xff;
     }
     return eHAL_STATUS_SUCCESS;
@@ -738,7 +731,7 @@ tSirRetStatus limSendTdlsDisReqFrame(tpAniSirGlobal pMac, tSirMacAddr peer_mac,
         limLog(pMac, LOGE, FL("could not send TDLS Discovery Request frame"));
         return eSIR_FAILURE;
     }
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.mgmtFrameSessionId = psessionEntry->smeSessionId;
 
     return eSIR_SUCCESS;
 
@@ -1016,7 +1009,7 @@ static tSirRetStatus limSendTdlsDisRspFrame(tpAniSirGlobal pMac,
         limLog(pMac, LOGE, FL("could not send TDLS Discovery Response frame!"));
         return eSIR_FAILURE;
     }
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.mgmtFrameSessionId = psessionEntry->smeSessionId;
 
     return eSIR_SUCCESS;
 
@@ -1324,7 +1317,7 @@ tSirRetStatus limSendTdlsLinkSetupReqFrame(tpAniSirGlobal pMac,
         limLog(pMac, LOGE, FL("could not send TDLS Setup Request frame!"));
         return eSIR_FAILURE;
     }
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.mgmtFrameSessionId = psessionEntry->smeSessionId;
 
     return eSIR_SUCCESS;
 
@@ -1518,7 +1511,7 @@ tSirRetStatus limSendTdlsTeardownFrame(tpAniSirGlobal pMac,
         return eSIR_FAILURE;
 
     }
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.mgmtFrameSessionId = psessionEntry->smeSessionId;
     return eSIR_SUCCESS;
 
 }
@@ -1779,7 +1772,7 @@ static tSirRetStatus limSendTdlsSetupRspFrame(tpAniSirGlobal pMac,
         limLog(pMac, LOGE, FL("could not send TDLS Setup Response"));
         return eSIR_FAILURE;
     }
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.mgmtFrameSessionId = psessionEntry->smeSessionId;
 
     return eSIR_SUCCESS;
 
@@ -2031,7 +2024,7 @@ tSirRetStatus limSendTdlsLinkSetupCnfFrame(tpAniSirGlobal pMac, tSirMacAddr peer
         return eSIR_FAILURE;
 
     }
-    pMac->lim.mgmtFrameSessionId = psessionEntry->peSessionId;
+    pMac->lim.mgmtFrameSessionId = psessionEntry->smeSessionId;
 
     return eSIR_SUCCESS;
 }

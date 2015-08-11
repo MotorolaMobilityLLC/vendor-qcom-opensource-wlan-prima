@@ -1649,7 +1649,7 @@ limSendSmeTDLSDeleteAllPeerInd(tpAniSirGlobal pMac, tpPESession psessionEntry)
  */
 void
 limSendSmeMgmtTXCompletion(tpAniSirGlobal pMac,
-                           tpPESession psessionEntry,
+                           tANI_U32 smeSessionId,
                            tANI_U32 txCompleteStatus)
 {
     tSirMsgQ  mmhMsg;
@@ -1667,7 +1667,7 @@ limSendSmeMgmtTXCompletion(tpAniSirGlobal pMac,
     pSirMgmtTxCompletionInd->length = sizeof(tSirMgmtTxCompletionInd);
 
     //sessionId
-    pSirMgmtTxCompletionInd->sessionId = psessionEntry->smeSessionId;
+    pSirMgmtTxCompletionInd->sessionId = smeSessionId;
 
     pSirMgmtTxCompletionInd->txCompleteStatus = txCompleteStatus;
 
