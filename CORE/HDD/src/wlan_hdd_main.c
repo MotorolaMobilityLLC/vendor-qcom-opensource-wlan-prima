@@ -7622,7 +7622,9 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
 
             connState = (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState;
 
-            hdd_init_station_mode(pAdapter);
+            if (!pHddCtx->isLogpInProgress)
+                hdd_init_station_mode(pAdapter);
+
             /* Open the gates for HDD to receive Wext commands */
             pAdapter->isLinkUpSvcNeeded = FALSE; 
             pHddCtx->scan_info.mScanPending = FALSE;
