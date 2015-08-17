@@ -1482,6 +1482,7 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
         if ( pSta->mlmStaContext.htCapability  && 
              psessionEntry->htCapability )
         {
+            limLog(pMac, LOG1, FL("Populate HT IEs in Assoc Response"));
             PopulateDot11fHTCaps( pMac, psessionEntry, &frm.HTCaps );
             /*
              *Check the STA capability and update the HTCaps accordingly
@@ -1495,6 +1496,13 @@ limSendAssocRspMgmtFrame(tpAniSirGlobal pMac,
 
             PopulateDot11fHTInfo( pMac, &frm.HTInfo, psessionEntry );
         }
+         limLog(pMac, LOG1, FL("SupportedChnlWidth: %d, mimoPS: %d, GF: %d,"
+                          "shortGI20:%d, shortGI40: %d, dsssCck: %d, AMPDU Param: %x"),
+                 frm.HTCaps.supportedChannelWidthSet, frm.HTCaps.mimoPowerSave,
+                 frm.HTCaps.greenField, frm.HTCaps.shortGI20MHz, frm.HTCaps.shortGI40MHz,
+                 frm.HTCaps.dsssCckMode40MHz, frm.HTCaps.maxRxAMPDUFactor);
+
+
 
 #ifdef WLAN_FEATURE_AP_HT40_24G
         /* Populate Overlapping BSS Scan Parameters IEs,
@@ -2442,6 +2450,7 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
     if ( psessionEntry->htCapability &&
             pMac->lim.htCapabilityPresentInBeacon)
     {
+        limLog(pMac, LOG1, FL("Populate HT IEs in Assoc Request"));
         PopulateDot11fHTCaps( pMac, psessionEntry, &pFrm->HTCaps );
 #ifdef DISABLE_GF_FOR_INTEROP
 
@@ -2461,6 +2470,14 @@ limSendAssocReqMgmtFrame(tpAniSirGlobal   pMac,
 #endif
 
     }
+
+    limLog(pMac, LOG1, FL("SupportedChnlWidth: %d, mimoPS: %d, GF: %d,"
+                          "shortGI20:%d, shortGI40: %d, dsssCck: %d, AMPDU Param: %x"),
+           pFrm->HTCaps.supportedChannelWidthSet, pFrm->HTCaps.mimoPowerSave,
+           pFrm->HTCaps.greenField, pFrm->HTCaps.shortGI20MHz, pFrm->HTCaps.shortGI40MHz,
+           pFrm->HTCaps.dsssCckMode40MHz, pFrm->HTCaps.maxRxAMPDUFactor);
+
+
 #ifdef WLAN_FEATURE_11AC
     if ( psessionEntry->vhtCapability &&
         psessionEntry->vhtCapabilityPresentInBeacon)
@@ -2925,7 +2942,11 @@ limSendReassocReqWithFTIEsMgmtFrame(tpAniSirGlobal     pMac,
     {
         PopulateDot11fHTCaps( pMac, psessionEntry, &frm.HTCaps );
     }
-
+    limLog(pMac, LOG1, FL("SupportedChnlWidth: %d, mimoPS: %d, GF: %d,"
+                          "shortGI20:%d, shortGI40: %d, dsssCck: %d, AMPDU Param: %x"),
+                 frm.HTCaps.supportedChannelWidthSet, frm.HTCaps.mimoPowerSave,
+                 frm.HTCaps.greenField, frm.HTCaps.shortGI20MHz, frm.HTCaps.shortGI40MHz,
+                 frm.HTCaps.dsssCckMode40MHz, frm.HTCaps.maxRxAMPDUFactor);
 #if defined WLAN_FEATURE_VOWIFI_11R
     if ( psessionEntry->pLimReAssocReq->bssDescription.mdiePresent &&
          (pMac->ft.ftSmeContext.addMDIE == TRUE)
@@ -3408,6 +3429,11 @@ limSendReassocReqMgmtFrame(tpAniSirGlobal     pMac,
     {
         PopulateDot11fHTCaps( pMac, psessionEntry, &frm.HTCaps );
     }
+    limLog(pMac, LOG1, FL("SupportedChnlWidth: %d, mimoPS: %d, GF: %d,"
+                          "shortGI20:%d, shortGI40: %d, dsssCck: %d, AMPDU Param: %x"),
+                 frm.HTCaps.supportedChannelWidthSet, frm.HTCaps.mimoPowerSave,
+                 frm.HTCaps.greenField, frm.HTCaps.shortGI20MHz, frm.HTCaps.shortGI40MHz,
+                 frm.HTCaps.dsssCckMode40MHz, frm.HTCaps.maxRxAMPDUFactor);
 #ifdef WLAN_FEATURE_11AC
     if ( psessionEntry->vhtCapability &&
              psessionEntry->vhtCapabilityPresentInBeacon)

@@ -605,10 +605,6 @@ PopulateDot11fHTCaps(tpAniSirGlobal           pMac,
        pDot11f->shortGI40MHz = 0;
     }
 
-    limLog(pMac, LOG1, FL("SupportedChnlWidth: %d, mimoPS: %d, GF: %d,"
-                          "shortGI20:%d, shortGI40: %d, dsssCck: %d\n"),
-           pDot11f->supportedChannelWidthSet, pDot11f->mimoPowerSave,  pDot11f->greenField,
-           pDot11f->shortGI20MHz, pDot11f->shortGI40MHz, pDot11f->dsssCckMode40MHz);
 
 
     CFG_GET_INT( nSirStatus, pMac, WNI_CFG_HT_AMPDU_PARAMS, nCfgValue );
@@ -619,9 +615,6 @@ PopulateDot11fHTCaps(tpAniSirGlobal           pMac,
     pDot11f->maxRxAMPDUFactor = pHTParametersInfo->maxRxAMPDUFactor;
     pDot11f->mpduDensity      = pHTParametersInfo->mpduDensity;
     pDot11f->reserved1        = pHTParametersInfo->reserved;
-
-    limLog( pMac, LOG1, FL( "AMPDU Param: %x\n" ), nCfgValue);
-
 
     CFG_GET_STR( nSirStatus, pMac, WNI_CFG_SUPPORTED_MCS_SET,
                  pDot11f->supportedMCSSet, nCfgLen,
@@ -2643,11 +2636,12 @@ sirConvertAssocRespFrame2Struct(tpAniSirGlobal pMac,
 
     if ( ar.HTCaps.present )
     {
+        limLog(pMac, LOG1, FL("Received Assoc Response with HT Cap"));
         vos_mem_copy( &pAssocRsp->HTCaps, &ar.HTCaps, sizeof( tDot11fIEHTCaps ) );
     }
 
     if ( ar.HTInfo.present )
-    {
+    {   limLog(pMac, LOG1, FL("Received Assoc Response with HT Info"));
         vos_mem_copy( &pAssocRsp->HTInfo, &ar.HTInfo, sizeof( tDot11fIEHTInfo ) );
     }
 

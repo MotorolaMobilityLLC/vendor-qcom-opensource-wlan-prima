@@ -153,6 +153,8 @@ of NV fragment is nt possbile.The next multiple of 1Kb is 3K */
 #define MAXNUM_PERIODIC_TX_PTRNS 6
 #define WDI_DISA_MAX_PAYLOAD_SIZE                1600
 #define MAX_NUM_OF_BUFFER 3
+#define VALID_FW_LOG_TYPES      2
+#define MAX_LOG_BUFFER_LENGTH      128 * 1024
 
 /*============================================================================
  *     GENERIC STRUCTURES 
@@ -2692,6 +2694,17 @@ typedef struct
   wpt_uint32 reserved1;
   wpt_uint32 reserved2;
 }WDI_FWLoggingInitRspParamType;
+
+
+/*---------------------------------------------------------------------------
+  WDI_FatalEventLogsRspParamType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /* wdi status */
+  wpt_uint32   wdiStatus;
+}WDI_FatalEventLogsRspParamType;
+
 /*---------------------------------------------------------------------------
   WDI_AddBAReqinfoType
 ---------------------------------------------------------------------------*/
@@ -4074,6 +4087,12 @@ typedef struct
    wpt_uint8 minLogBufferSize;
    wpt_uint8 maxLogBufferSize;
 }WDI_FWLoggingInitReqInfoType;
+
+typedef struct
+{
+    wpt_uint32 reason_code;
+}WDI_FatalEventLogsReqInfoType;
+
 
 typedef struct
 {
@@ -8025,6 +8044,8 @@ typedef void  (*WDI_FWLoggingInitRspCb)(
                         WDI_FWLoggingInitRspParamType *wdiRsp, void *pUserData);
 typedef void  (*WDI_GetFrameLogRspCb)(
                         WDI_GetFrameLogRspParamType *wdiRsp, void *pUserData);
+typedef void  (*WDI_FatalEventLogsRspCb)(
+                         WDI_FatalEventLogsRspParamType *wdiRsp, void *pUserData);
 
 typedef void  (*WDI_MonStartRspCb)(void *pEventData,void *pUserData);
 typedef void  (*WDI_MonStopRspCb)(void *pUserData);
@@ -9456,6 +9477,39 @@ WDI_SetUapsdAcParamsReq
   WDI_SetUapsdAcParamsCb  wdiSetUapsdAcParamsCb,
   void*                   pUserData
 );
+
+
+/**
+ @brief WDI_FatalEventLogsReq will be called when the upper
+        MAC wants to send the fatal event req. Upon the call of
+        this API the WLAN DAL will pack and send a HAL
+        Fatal event request message to the lower RIVA sub-system.
+
+        In state BUSY this request will be queued. Request won't
+        be allowed in any other state.
+
+
+ @param pwdiFatalEventLogsReqInfo: the Fatal event logs params
+                      as specified by the Device Interface
+
+        wdiFatalEventLogsRspCb: callback for passing back the
+        response of the fatal event operation received
+        from the device
+
+        pUserData: user data will be passed back with the
+        callback
+
+ @return Result of the function call
+*/
+
+WDI_Status
+WDI_FatalEventLogsReq
+(
+   WDI_FatalEventLogsReqInfoType      *pwdiFatalEventLogsReqInfo,
+   WDI_FatalEventLogsRspCb             wdiFatalEventLogsRspCb,
+   void*                               pUserData
+);
+
 /**
  @brief WDI_GetFrameLogReq will be called when the upper
         MAC wants to initialize frame logging. Upon the call of

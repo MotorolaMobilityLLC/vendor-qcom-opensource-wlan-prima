@@ -888,13 +888,18 @@ sme_process_cmd:
                 {
                     // we can reuse the pCommand
 
-                    /* For roam command set timeout to 30 * 2 sec.
+                    /* For ROC set timeot to 30 *3 as Supplicant can retry
+                     * P2P Invitation Request 120 times with 500ms interval.
+                     * For roam command set timeout to 30 * 2 sec.
                      * There are cases where we try to connect to different
                      * APs with same SSID one by one until sucessfully conneted
                      * and thus roam command might take more time if connection
                      * is rejected by too many APs.
                      */
-                    if ((eSmeCommandRoam == pCommand->command) &&
+                    if (eSmeCommandRemainOnChannel == pCommand->command)
+                        pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
+                                         CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE * 3;
+                    else if ((eSmeCommandRoam == pCommand->command) &&
                         (eCsrHddIssued == pCommand->u.roamCmd.roamReason))
                         pMac->sme.smeCmdActiveList.cmdTimeoutDuration =
                                          CSR_ACTIVE_LIST_CMD_TIMEOUT_VALUE * 2;
@@ -12793,6 +12798,55 @@ eHalStatus sme_SetRtsCtsHtVht(tHalHandle hHal, tANI_U32 set_value)
     return eHAL_STATUS_FAILURE;
 
 }
+
+
+/* ---------------------------------------------------------------------------
+    \fn sme_fatal_event_logs_req
+    \brief  API to to send flush log command to FW..
+
+    \param  hHal - Mac Context Handle
+    \- return VOS_STATUS_SUCCES if command is posted to
+       WDA else return eHAL_STATUS_FAILURE
+    -------------------------------------------------------------------------*/
+eHalStatus sme_fatal_event_logs_req(tHalHandle hHal, tANI_U32 is_fatal,
+                               tANI_U32 indicator, tANI_U32 reason_code)
+{
+    tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
+    vos_msg_t msg;
+    eHalStatus status = eHAL_STATUS_SUCCESS;
+    VOS_STATUS vosStatus = VOS_STATUS_SUCCESS;
+    tpSirFatalEventLogsReqParam pFatalEventLogsReqParams;
+
+    if ( eHAL_STATUS_SUCCESS ==  sme_AcquireGlobalLock( &pMac->sme ))
+    {
+        pFatalEventLogsReqParams = vos_mem_malloc(sizeof(tSirFatalEventLogsReqParam));
+        if(NULL == pFatalEventLogsReqParams)
+        {
+            smsLog(pMac, LOGE,
+                 FL("vos_mem_alloc failed "));
+            return eHAL_STATUS_FAILED_ALLOC;
+        }
+        vos_mem_set(pFatalEventLogsReqParams, sizeof(pFatalEventLogsReqParams), 0);
+        pFatalEventLogsReqParams->reason_code = reason_code;
+
+        vos_mem_zero(&msg, sizeof(vos_msg_t));
+        msg.type = WDA_FATAL_EVENT_LOGS_REQ;
+        msg.reserved = 0;
+        msg.bodyptr = pFatalEventLogsReqParams;
+        msg.bodyval = 0;
+        vosStatus = vos_mq_post_message( VOS_MQ_ID_WDA, &msg);
+        if ( !VOS_IS_STATUS_SUCCESS(vosStatus) )
+        {
+           vos_mem_free(pFatalEventLogsReqParams);
+           status = eHAL_STATUS_FAILURE;
+        }
+        sme_ReleaseGlobalLock( &pMac->sme );
+        return status;
+
+    }
+    return eHAL_STATUS_FAILURE;
+}
+
 
 /**
  * sme_handleSetFccChannel() - handle fcc constraint request
