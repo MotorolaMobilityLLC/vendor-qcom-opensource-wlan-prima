@@ -102,8 +102,10 @@
 #include "sme_Api.h"
 #include "vos_trace.h"
 #include "wlan_hdd_assoc.h"
-
+#include <linux/ratelimit.h>
+#ifdef DEBUG_ROAM_DELAY
 #include "vos_utils.h"
+#endif
 #include "sapInternal.h"
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -381,6 +383,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define TX_PWR_MIN  6
 #define TX_PWR_MAX 22
 #define TX_PWR_DEF 50
+
+#define HDD_IOCTL_RATELIMIT_INTERVAL (20*HZ)
 
 /*
  * When supplicant sends SETBAND ioctl it queries for channels from
@@ -7433,6 +7437,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
             sme_HT40StopOBSSScan(pMac, pAdapter->sessionId);
         }
         break;
+#ifdef DEBUG_ROAM_DELAY
         case WE_DUMP_ROAM_TIMER_LOG:
         {
             vos_dump_roam_time_log_service();
@@ -7444,6 +7449,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
             vos_reset_roam_timer_log();
             break;
         }
+#endif
         case WE_GET_FW_LOGS:
         {
             vos_fatal_event_logs_req(WLAN_LOG_TYPE_NON_FATAL,
