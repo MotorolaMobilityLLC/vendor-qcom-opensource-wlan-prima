@@ -3314,8 +3314,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3371,8 +3371,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3479,8 +3479,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            tANI_U8 len = 0;
 
            len = scnprintf(extra, sizeof(extra), "%s %d", command, wesMode);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3833,8 +3833,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
 
            len = scnprintf(extra, sizeof(extra), "%s %d",
                    command, roamScanControl);
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -3928,6 +3928,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
 
            memset(extra, 0, sizeof(extra));
            ret = hdd_get_dwell_time(pCfg, command, extra, sizeof(extra), &len);
+           len = VOS_MIN(priv_data.total_len, len + 1);
            if (ret != 0 || copy_to_user(priv_data.buf, &extra, len + 1))
            {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -4159,8 +4160,8 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                   tsmMetrics.UplinkPktLoss, tsmMetrics.UplinkPktCount, tsmMetrics.RoamingCount,
                   tsmMetrics.RoamingDly);
 
-           if (copy_to_user(priv_data.buf, &extra, len + 1))
-           {
+           len = VOS_MIN(priv_data.total_len, len + 1);
+           if (copy_to_user(priv_data.buf, &extra, len)) {
                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: failed to copy data to user buffer", __func__);
                ret = -EFAULT;
@@ -8712,14 +8713,13 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
 
    hdd_close_all_adapters( pHddCtx );
 
+free_hdd_ctx:
    /* free the power on lock from platform driver */
    if (free_riva_power_on_lock("wlan"))
    {
       hddLog(VOS_TRACE_LEVEL_ERROR, "%s: failed to free power on lock",
                                            __func__);
    }
-
-free_hdd_ctx:
 
    //Free up dynamically allocated members inside HDD Adapter
    if (pHddCtx->cfg_ini)
@@ -11822,7 +11822,7 @@ int hdd_sta_id_find_from_mac_addr(hdd_adapter_t *pAdapter,
     spin_lock_bh( &pAdapter->sta_hash_lock);
     if (pAdapter->is_sta_id_hash_initialized != VOS_TRUE) {
         spin_unlock_bh( &pAdapter->sta_hash_lock);
-        hddLog(VOS_TRACE_LEVEL_ERROR,
+        hddLog(VOS_TRACE_LEVEL_INFO,
                   FL("hash is not initialized for session id %d"),
                   pAdapter->sessionId);
         return HDD_WLAN_INVALID_STA_ID;
