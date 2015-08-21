@@ -14065,6 +14065,11 @@ VOS_STATUS WDA_McProcessMsg( v_CONTEXT_t pVosContext, vos_msg_t *pMsg )
                                         (tAniGetFrameLogReq *)pMsg->bodyptr);
          break;
       }
+      case WDA_SEND_LOG_DONE_IND:
+      {
+         WDA_FWLoggingDXEdoneInd();
+         break;
+      }
       case WDA_FATAL_EVENT_LOGS_REQ:
       {
          WDA_ProcessFatalEventLogsReq(pWDA,
