@@ -14782,7 +14782,6 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
                      u16 status_code, const u8 *buf, size_t len)
 #endif
 {
-
     hdd_adapter_t *pAdapter;
     hdd_context_t *pHddCtx;
     u8 peerMac[6];
@@ -14795,6 +14794,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
     u32 peer_capability = 0;
 #endif
     tANI_U16 numCurrTdlsPeers;
+    hdd_station_ctx_t *pHddStaCtx = NULL;
 
     pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     if (NULL == pAdapter)
@@ -14806,6 +14806,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
                      TRACE_CODE_HDD_CFG80211_TDLS_MGMT,
                      pAdapter->sessionId, action_code));
+
     pHddCtx = wiphy_priv(wiphy);
     if (NULL == pHddCtx || NULL == pHddCtx->cfg_ini)
     {
@@ -14813,6 +14814,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
                 "Invalid arguments");
         return -EINVAL;
     }
+
     if (pHddCtx->isLogpInProgress)
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -14823,12 +14825,14 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
                                       eTDLS_LINK_UNSPECIFIED);
         return -EBUSY;
     }
+
     if (WLAN_HDD_IS_LOAD_UNLOAD_IN_PROGRESS(pHddCtx))
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
         return -EAGAIN;
     }
+
     if (eTDLS_SUPPORT_NOT_ENABLED == pHddCtx->tdls_mode)
     {
          VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
@@ -14836,6 +14840,29 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
                     MAC_ADDRESS_STR " action %d declined.",
                     __func__, MAC_ADDR_ARRAY(peer), action_code);
         return -ENOTSUPP;
+    }
+
+    pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+
+    if( NULL == pHddStaCtx )
+    {
+       VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+               "%s: HDD station context NULL ",__func__);
+       return -EINVAL;
+    }
+
+    /* STA should be connected and authenticated
+     * before sending any TDLS frames
+     */
+    if ((eConnectionState_Associated != pHddStaCtx->conn_info.connState) ||
+        (FALSE == pHddStaCtx->conn_info.uIsAuthenticated))
+    {
+        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                "STA is not connected or unauthenticated. "
+                "connState %u, uIsAuthenticated %u",
+                pHddStaCtx->conn_info.connState,
+                pHddStaCtx->conn_info.uIsAuthenticated);
+        return -EAGAIN;
     }
 
     /* other than teardown frame, other mgmt frames are not sent if disabled */
@@ -14849,7 +14876,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
                         " TDLS mode is disabled. action %d declined.",
                         __func__, MAC_ADDR_ARRAY(peer), action_code);
 
-        return -ENOTSUPP;
+             return -ENOTSUPP;
         }
 
         if (vos_max_concurrent_connections_reached())
@@ -14980,8 +15007,10 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
     pAdapter->mgmtTxCompletionStatus = TDLS_CTX_MAGIC;
     INIT_COMPLETION(pAdapter->tdls_mgmt_comp);
 
-    status = sme_SendTdlsMgmtFrame(WLAN_HDD_GET_HAL_CTX(pAdapter), pAdapter->sessionId,
-              peerMac, action_code, dialog_token, status_code, peer_capability, (tANI_U8 *)buf, len, responder);
+    status = sme_SendTdlsMgmtFrame(WLAN_HDD_GET_HAL_CTX(pAdapter),
+            pAdapter->sessionId, peer, action_code, dialog_token,
+            status_code, peer_capability, (tANI_U8 *)buf, len,
+            responder);
 
     if (VOS_STATUS_SUCCESS != status)
     {
@@ -14991,6 +15020,21 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
         ret = -EINVAL;
         goto tx_failed;
     }
+
+    if ((SIR_MAC_TDLS_DIS_REQ == action_code) ||
+        (SIR_MAC_TDLS_DIS_RSP == action_code))
+    {
+        /* for DIS_REQ/DIS_RSP, supplicant don't consider the return status.
+         * So we no need to wait for tdls_mgmt_comp for sending ack status.
+         */
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                "%s: tx done for frm %u", __func__, action_code);
+        return 0;
+    }
+
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+            "%s: Wait for tdls_mgmt_comp. Timeout %u ms", __func__,
+            WAIT_TIME_TDLS_MGMT);
 
     rc = wait_for_completion_interruptible_timeout(&pAdapter->tdls_mgmt_comp,
                                                         msecs_to_jiffies(WAIT_TIME_TDLS_MGMT));
@@ -15011,6 +15055,12 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy, struct net_device 
 
         ret = -EINVAL;
         goto tx_failed;
+    }
+    else
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                "%s: Mgmt Tx Completion status %ld TxCompletion %u",
+                __func__, rc, pAdapter->mgmtTxCompletionStatus);
     }
 
     if (max_sta_failed)
