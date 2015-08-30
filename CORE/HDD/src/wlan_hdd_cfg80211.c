@@ -5391,8 +5391,13 @@ __wlan_hdd_cfg80211_setband(struct wiphy *wiphy,
         return -EINVAL;
     }
 
-    return hdd_setBand(dev,
+    hdd_ctx->isSetBandByNL = TRUE;
+    ret = hdd_setBand(dev,
                        nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_SETBAND_VALUE]));
+    hdd_ctx->isSetBandByNL = FALSE;
+
+    EXIT();
+    return ret;
 }
 
 /**
@@ -13305,12 +13310,11 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy, struct net_devic
         return status;
     }
 
+    wlan_hdd_get_station_stats(pAdapter);
+    rate_flags = pAdapter->hdd_stats.ClassA_stat.tx_rate_flags;
 
     wlan_hdd_get_rssi(pAdapter, &sinfo->signal);
     sinfo->filled |= STATION_INFO_SIGNAL;
-
-    wlan_hdd_get_station_stats(pAdapter);
-    rate_flags = pAdapter->hdd_stats.ClassA_stat.tx_rate_flags;
 
     /*overwrite rate_flags if MAX link-speed need to be reported*/
     if ((eHDD_LINK_SPEED_REPORT_MAX == pCfg->reportMaxLinkSpeed) ||
