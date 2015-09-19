@@ -32171,7 +32171,7 @@ WDI_Status WDI_FWStatsGetReq( void* pUserData,
 
 WDI_Status
 WDI_MonStartReq(WDI_MonStartReqType* pwdiMonStartReqParams,
-                           WDI_MonStartRspCb   wdiMonStartRspCb,
+                           WDI_MonModeRspCb   wdiMonModeRspCb,
                            void*                   pUserData)
 {
    WDI_EventInfoType      wdiEventData;
@@ -32190,7 +32190,7 @@ WDI_MonStartReq(WDI_MonStartReqType* pwdiMonStartReqParams,
   wdiEventData.wdiRequest      = WDI_MON_START_REQ;
   wdiEventData.pEventData      = pwdiMonStartReqParams;
   wdiEventData.uEventDataSize  = sizeof(*pwdiMonStartReqParams);
-  wdiEventData.pCBfnc          = wdiMonStartRspCb;
+  wdiEventData.pCBfnc          = wdiMonModeRspCb;
   wdiEventData.pUserData       = pUserData;
 
   return WDI_PostMainEvent(&gWDICb, WDI_REQUEST_EVENT, &wdiEventData);
@@ -32204,7 +32204,7 @@ WDI_ProcessMonStartReq
 )
 {
   WDI_MonStartReqType* pwdiMonStartReqParams;
-  WDI_MonStartRspCb wdiMonStartCb;
+  WDI_MonModeRspCb wdiMonStartCb;
   wpt_uint8*               pSendBuffer         = NULL;
   wpt_uint16               usSendSize          = 0;
   wpt_uint16               usDataOffset        = 0;
@@ -32223,7 +32223,7 @@ WDI_ProcessMonStartReq
   }
 
   pwdiMonStartReqParams = (WDI_MonStartReqType*)pEventData->pEventData;
-  wdiMonStartCb   = (WDI_MonStartRspCb)pEventData->pCBfnc;
+  wdiMonStartCb   = (WDI_MonModeRspCb)pEventData->pCBfnc;
 
   /*-----------------------------------------------------------------------
     Get message buffer
@@ -32277,7 +32277,7 @@ WDI_ProcessMonStartRsp
   WDI_EventInfoType*     pEventData
 )
 {
-  WDI_MonStartRspCb   wdiMonStartRspCb;
+  WDI_MonModeRspCb   wdiMonStartRspCb;
 
   WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
               "%s: Enter ", __func__);
@@ -32293,7 +32293,7 @@ WDI_ProcessMonStartRsp
      return WDI_STATUS_E_FAILURE;
   }
 
-  wdiMonStartRspCb = (WDI_MonStartRspCb)pWDICtx->pfncRspCB;
+  wdiMonStartRspCb = (WDI_MonModeRspCb)pWDICtx->pfncRspCB;
 
   wdiMonStartRspCb((void *) pEventData->pEventData, pWDICtx->pRspCBUserData);
 
@@ -32301,7 +32301,7 @@ WDI_ProcessMonStartRsp
 }
 
 WDI_Status
-WDI_MonStopReq(WDI_MonStopRspCb wdiMonStopRspCb,
+WDI_MonStopReq(WDI_MonModeRspCb wdiMonModeRspCb,
                void*                 pUserData)
 {
    WDI_EventInfoType      wdiEventData;
@@ -32320,7 +32320,7 @@ WDI_MonStopReq(WDI_MonStopRspCb wdiMonStopRspCb,
   wdiEventData.wdiRequest      = WDI_MON_STOP_REQ;
   wdiEventData.pEventData      = NULL;
   wdiEventData.uEventDataSize  = sizeof(NULL);
-  wdiEventData.pCBfnc          = wdiMonStopRspCb;
+  wdiEventData.pCBfnc          = wdiMonModeRspCb;
   wdiEventData.pUserData       = pUserData;
 
   return WDI_PostMainEvent(&gWDICb, WDI_REQUEST_EVENT, &wdiEventData);
@@ -32333,7 +32333,7 @@ WDI_ProcessMonStopReq
   WDI_EventInfoType*     pEventData
 )
 {
-  WDI_MonStopRspCb         wdiMonStopCb;
+  WDI_MonModeRspCb         wdiMonStopCb;
   wpt_uint8*               pSendBuffer         = NULL;
   wpt_uint16               usSendSize          = 0;
   wpt_uint16               usDataOffset        = 0;
@@ -32350,7 +32350,7 @@ WDI_ProcessMonStopReq
      return WDI_STATUS_E_FAILURE;
   }
 
-  wdiMonStopCb   = (WDI_MonStopRspCb)pEventData->pCBfnc;
+  wdiMonStopCb   = (WDI_MonModeRspCb)pEventData->pCBfnc;
 
   /*-----------------------------------------------------------------------
     Get message buffer
@@ -32389,7 +32389,7 @@ WDI_ProcessMonStopRsp
   WDI_EventInfoType*     pEventData
 )
 {
-  WDI_MonStopRspCb   wdiMonStopRspCb;
+  WDI_MonModeRspCb   wdiMonStopRspCb;
 
   WPAL_TRACE( eWLAN_MODULE_DAL_CTRL, eWLAN_PAL_TRACE_LEVEL_ERROR,
               "%s: Enter ", __func__);
@@ -32404,9 +32404,9 @@ WDI_ProcessMonStopRsp
      return WDI_STATUS_E_FAILURE;
   }
 
-  wdiMonStopRspCb = (WDI_MonStopRspCb)pWDICtx->pfncRspCB;
+  wdiMonStopRspCb = (WDI_MonModeRspCb)pWDICtx->pfncRspCB;
 
-  wdiMonStopRspCb(pWDICtx->pRspCBUserData);
+  wdiMonStopRspCb(pWDICtx->pRspCBUserData, pWDICtx->pRspCBUserData);
 
   return WDI_STATUS_SUCCESS;
 }
