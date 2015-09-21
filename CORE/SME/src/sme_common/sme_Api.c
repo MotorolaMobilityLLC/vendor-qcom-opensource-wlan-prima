@@ -10699,6 +10699,9 @@ VOS_STATUS sme_SelectCBMode(tHalHandle hHal, eCsrPhyMode eCsrPhyMode, tANI_U8 ch
 {
    tSmeConfigParams  smeConfig;
    tpAniSirGlobal    pMac = PMAC_STRUCT(hHal);
+#ifdef WLAN_FEATURE_11AC
+   tANI_U8 vht80Allowed;
+#endif
 
    if (
 #ifdef WLAN_FEATURE_11AC
@@ -10729,33 +10732,59 @@ VOS_STATUS sme_SelectCBMode(tHalHandle hHal, eCsrPhyMode eCsrPhyMode, tANI_U8 ch
    if ( eCSR_DOT11_MODE_11ac == eCsrPhyMode ||
          eCSR_DOT11_MODE_11ac_ONLY == eCsrPhyMode )
    {
-      if ( channel== 36 || channel == 52 || channel == 100 ||
+      /* Check if VHT80 is allowed for the channel*/
+      vht80Allowed = vos_is_channel_valid_for_vht80(channel);
+      if (vht80Allowed)
+      {
+         if ( channel== 36 || channel == 52 || channel == 100 ||
             channel == 116 || channel == 149 )
-      {
-         smeConfig.csrConfig.channelBondingMode5GHz =
-            PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW - 1;
-      }
-      else if ( channel == 40 || channel == 56 || channel == 104 ||
+         {
+            smeConfig.csrConfig.channelBondingMode5GHz =
+              PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW - 1;
+         }
+         else if ( channel == 40 || channel == 56 || channel == 104 ||
             channel == 120 || channel == 153 )
-      {
-         smeConfig.csrConfig.channelBondingMode5GHz =
-            PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW - 1;
-      }
-      else if ( channel == 44 || channel == 60 || channel == 108 ||
+         {
+            smeConfig.csrConfig.channelBondingMode5GHz =
+             PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW - 1;
+         }
+         else if ( channel == 44 || channel == 60 || channel == 108 ||
             channel == 124 || channel == 157 )
-      {
-         smeConfig.csrConfig.channelBondingMode5GHz =
-            PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH -1;
+         {
+            smeConfig.csrConfig.channelBondingMode5GHz =
+             PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH -1;
+         }
+         else if ( channel == 48 || channel == 64 || channel == 112 ||
+             channel == 128 || channel == 144 || channel == 161 )
+         {
+            smeConfig.csrConfig.channelBondingMode5GHz =
+             PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH - 1;
+         }
+         else if (channel == 165)
+         {
+            smeConfig.csrConfig.channelBondingMode5GHz = 0;
+         }
       }
-      else if ( channel == 48 || channel == 64 || channel == 112 ||
-            channel == 128 || channel == 144 || channel == 161 )
+      else /* Set VHT40 */
       {
-         smeConfig.csrConfig.channelBondingMode5GHz =
-            PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH - 1;
-      }
-      else if ( channel == 165 )
-      {
-         smeConfig.csrConfig.channelBondingMode5GHz = 0;
+        if (channel== 40 || channel == 48 || channel == 56 ||
+            channel == 64 || channel == 104 || channel == 112 ||
+            channel == 120 || channel == 128 || channel == 136 ||
+            channel == 144 || channel == 153 || channel == 161)
+        {
+            smeConfig.csrConfig.channelBondingMode5GHz = 1;
+        }
+        else if (channel== 36 || channel == 44 || channel == 52 ||
+            channel == 60 || channel == 100 || channel == 108 ||
+            channel == 116 || channel == 124 || channel == 132 ||
+            channel == 140 || channel == 149 || channel == 157)
+        {
+            smeConfig.csrConfig.channelBondingMode5GHz = 2;
+        }
+        else if (channel == 165)
+        {
+            smeConfig.csrConfig.channelBondingMode5GHz = 0;
+        }
       }
    }
 #endif
