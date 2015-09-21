@@ -379,4 +379,11 @@ wlan_hdd_tdls_disable_offchan_and_teardown_links(hdd_context_t *pHddCtx)
 #endif
 void wlan_hdd_tdls_update_rx_pkt_cnt_n_rssi(hdd_adapter_t *pAdapter,
         u8 *mac, v_S7_t rssiAvg);
+
+
+tdlsConnInfo_t *wlan_hdd_get_conn_info(hdd_context_t *pHddCtx,
+                                       tANI_U8 idx);
+
+v_VOID_t wlan_hdd_tdls_initiator_wait_cb(v_PVOID_t userData);
+
 #endif // __HDD_TDSL_H
