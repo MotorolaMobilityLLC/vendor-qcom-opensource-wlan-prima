@@ -1677,4 +1677,7 @@ VOS_STATUS hdd_sta_id_hash_remove_entry(hdd_adapter_t *pAdapter,
 int hdd_sta_id_find_from_mac_addr(hdd_adapter_t *pAdapter,
                                   v_MACADDR_t *mac_addr_in);
 void hdd_init_frame_logging(hdd_context_t *pHddCtx);
+
+int hdd_enable_disable_ca_event(hdd_context_t *pHddCtx,
+                                tANI_U8* command, tANI_U8 cmd_len);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

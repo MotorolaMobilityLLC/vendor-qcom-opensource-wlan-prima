@@ -1284,7 +1284,9 @@ eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
 #define WDA_MGMT_LOGGING_INIT_REQ               SIR_HAL_MGMT_LOGGING_INIT_REQ
 #define WDA_GET_FRAME_LOG_REQ                   SIR_HAL_GET_FRAME_LOG_REQ
 
-#define WDA_FATAL_EVENT_LOGS_REQ                   SIR_HAL_FATAL_EVENT_LOGS_REQ
+#define WDA_FATAL_EVENT_LOGS_REQ                SIR_HAL_FATAL_EVENT_LOGS_REQ
+
+#define WDA_SEND_FREQ_RANGE_CONTROL_IND        SIR_HAL_SEND_FREQ_RANGE_CONTROL_IND
 
 
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40 // Bit 6 will be used to control BD rate for Management frames
