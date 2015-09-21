@@ -7784,7 +7784,13 @@ VOS_STATUS hdd_reconnect_all_adapters( hdd_context_t *pHddCtx )
          hddLog(VOS_TRACE_LEVEL_INFO,
             "%s: Set HDD connState to eConnectionState_NotConnected",
                    __func__);
+         spin_lock_bh(&pAdapter->lock_for_active_session);
+         if (eConnectionState_Associated ==  pHddStaCtx->conn_info.connState)
+         {
+             wlan_hdd_decr_active_session(pHddCtx, pAdapter->device_mode);
+         }
          pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
+         spin_unlock_bh(&pAdapter->lock_for_active_session);
          init_completion(&pAdapter->disconnect_comp_var);
          sme_RoamDisconnect(pHddCtx->hHal, pAdapter->sessionId,
                              eCSR_DISCONNECT_REASON_UNSPECIFIED);
@@ -8026,6 +8032,34 @@ hdd_adapter_t * hdd_get_adapter_by_name( hdd_context_t *pHddCtx, tANI_U8 *name )
    return NULL;
 
 } 
+
+hdd_adapter_t *hdd_get_adapter_by_sme_session_id( hdd_context_t *pHddCtx,
+                                        tANI_U32 sme_session_id )
+{
+    hdd_adapter_list_node_t *pAdapterNode = NULL, *pNext = NULL;
+    hdd_adapter_t *pAdapter;
+    VOS_STATUS vos_status;
+
+
+    vos_status = hdd_get_front_adapter( pHddCtx, &pAdapterNode);
+
+    while ((NULL != pAdapterNode) && (VOS_STATUS_SUCCESS == vos_status))
+    {
+        pAdapter = pAdapterNode->pAdapter;
+
+        if (pAdapter->sessionId == sme_session_id)
+            return pAdapter;
+
+        vos_status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
+        pAdapterNode = pNext;
+    }
+
+    VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+            "%s: sme_session_id %d does not exist with host",
+            __func__, sme_session_id);
+
+    return NULL;
+}
 
 hdd_adapter_t * hdd_get_adapter( hdd_context_t *pHddCtx, device_mode_t mode )
 {
