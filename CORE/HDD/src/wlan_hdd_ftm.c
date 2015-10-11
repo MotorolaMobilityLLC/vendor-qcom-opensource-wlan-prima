@@ -5550,7 +5550,7 @@ static int __iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_reque
 
     if(wrqu->data.length != 2)
     {
-        hddLog(LOGE, "Invalid number of Arguments  %d  \n",  wrqu->data.length);
+        hddLog(LOGE, "Invalid number of Arguments  %d ",  wrqu->data.length);
         return -EINVAL;
     }
     pAdapter = (netdev_priv(dev));
@@ -5589,7 +5589,7 @@ static int __iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_reque
 
         default:
         {
-            hddLog(LOGE, "Invalid IOCTL command %d  \n", sub_cmd );
+            hddLog(LOGE, "Invalid IOCTL command %d ", sub_cmd );
             break;
         }
     }
