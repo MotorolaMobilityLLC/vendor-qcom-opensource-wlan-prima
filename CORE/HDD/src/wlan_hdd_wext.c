@@ -9436,9 +9436,8 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
     int wait_result;
     eCsrBand currBand = eCSR_BAND_MAX;
     eCsrBand connectedBand;
-    v_U8_t ret = SEND_CHANNEL_CHANGE_EVENT;
     tpAniSirGlobal pMac;
-    int retval = 0;
+    int retval = SEND_CHANNEL_CHANGE_EVENT;
 
     ENTER();
     pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -9619,7 +9618,7 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
                            " in kernel db");
              }
 
-             ret = DO_NOT_SEND_CHANNEL_CHANGE_EVENT;
+             retval = DO_NOT_SEND_CHANNEL_CHANGE_EVENT;
         }
         else
         {
@@ -9680,7 +9679,10 @@ int hdd_setBand(struct net_device *dev, u8 ui_band)
         }
     }
     EXIT();
-    return ret;
+    if (TRUE == pHddCtx->isSetBandByNL)
+        return 0;
+    else
+        return retval;
 }
 
 int hdd_setBand_helper(struct net_device *dev, const char *command)
