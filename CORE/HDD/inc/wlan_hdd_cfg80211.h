@@ -323,6 +323,28 @@ enum qca_wlan_vendor_attr_ll_stats_clr
                         QCA_WLAN_VENDOR_ATTR_LL_STATS_CLR_AFTER_LAST - 1,
 };
 
+/**
+ * enum qca_wlan_vendor_attr_ll_stats_results_type - ll stats result type
+ *
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_INVALID: Initial invalid value
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_RADIO: Link layer stats type radio
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_IFACE: Link layer stats type interface
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_PEER: Link layer stats type peer
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_AFTER_LAST: Last value
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_MAX: Max value
+ */
+enum qca_wlan_vendor_attr_ll_stats_results_type {
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_INVALID = 0,
+
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_RADIO = 1,
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_IFACE,
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_PEER,
+
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_AFTER_LAST,
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_MAX =
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE_AFTER_LAST - 1
+};
+
 enum qca_wlan_vendor_attr_ll_stats_results
 {
     QCA_WLAN_VENDOR_ATTR_LL_STATS_INVALID = 0,
@@ -548,6 +570,21 @@ enum qca_wlan_vendor_attr_ll_stats_results
      * Otherwise, it is set to 0.
      */
     QCA_WLAN_VENDOR_ATTR_LL_STATS_RESULTS_MORE_DATA,
+
+    /* Unsigned 64bit value */
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_AVERAGE_TSF_OFFSET,
+
+    /* Unsigned 32bit value */
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_DETECTED,
+
+    /* Unsigned 32bit value */
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_AVG_NUM_FRAMES_LEAKED,
+
+    /* Unsigned 32bit value */
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_LEAKY_AP_GUARD_TIME,
+
+    /* Unsigned 32bit value to indicate ll stats result type */
+    QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
 
     /* keep last */
     QCA_WLAN_VENDOR_ATTR_LL_STATS_AFTER_LAST,
@@ -862,6 +899,8 @@ enum qca_wlan_vendor_attr_get_concurrency_matrix {
 #define WIFI_FEATURE_EPR                0x4000   /* Enhanced power reporting */
 #define WIFI_FEATURE_AP_STA             0x8000   /* Support for AP STA
                                                     Concurrency */
+#define WIFI_FEATURE_LINK_LAYER_STATS   0x10000  /* Link layer stats */
+
 /* Add more features here */
 enum qca_wlan_vendor_attr_set_no_dfs_flag
 {
