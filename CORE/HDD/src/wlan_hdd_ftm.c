@@ -5060,6 +5060,13 @@ static int iw_ftm_setchar_getnone(struct net_device *dev, struct iw_request_info
     hdd_adapter_t *pAdapter;
     struct iw_point s_priv_data;
 
+    if (!capable(CAP_NET_ADMIN))
+    {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("permission check failed"));
+        return -EPERM;
+    }
+
     ret =0;
     /* helper function to get iwreq_data with compat handling. */
     if (hdd_priv_get_data(&s_priv_data, wrqu))
