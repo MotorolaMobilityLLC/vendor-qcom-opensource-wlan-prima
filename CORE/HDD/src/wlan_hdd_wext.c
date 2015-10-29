@@ -7325,6 +7325,13 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
        return -EINVAL;
     }
 
+    if (!capable(CAP_NET_ADMIN))
+    {
+     VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+               FL("permission check failed"));
+               return -EPERM;
+    }
+
     /* ODD number is used for set, copy data using copy_from_user */
     pRequest = mem_alloc_copy_from_user_helper(s_priv_data.pointer,
                                                s_priv_data.length);
