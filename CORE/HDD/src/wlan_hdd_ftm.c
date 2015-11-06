@@ -5593,6 +5593,13 @@ static int iw_ftm_set_var_ints_getnone(struct net_device *dev, struct iw_request
 {
    int ret;
 
+   if (!capable(CAP_NET_ADMIN))
+   {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+           FL("permission check failed"));
+        return -EPERM;
+   }
+
    vos_ssr_protect(__func__);
    ret = __iw_ftm_set_var_ints_getnone(dev, info, wrqu, extra);
    vos_ssr_unprotect(__func__);
