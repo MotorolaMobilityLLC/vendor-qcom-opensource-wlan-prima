@@ -190,8 +190,8 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define WE_GET_WDI_DBG       7
 #define WE_GET_SAP_AUTO_CHANNEL_SELECTION 8
 #define WE_GET_CONCURRENCY_MODE 9
-#define WE_GET_SCAN_BAND_PREFERENCE     10
-#define WE_GET_MCC_MODE      11 /* MOTOROLA IKJB42MAIN-274 */
+#define WE_GET_MCC_MODE      10 /* Motorola, IKSWM-4204  */
+#define WE_GET_SCAN_BAND_PREFERENCE     11
 #define WE_GET_ANTENA_DIVERSITY_SELECTION 12
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_INT_GET_INT     (SIOCIWFIRSTPRIV + 2)
