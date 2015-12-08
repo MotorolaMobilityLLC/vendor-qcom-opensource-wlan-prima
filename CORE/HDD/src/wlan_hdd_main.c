@@ -3460,7 +3460,7 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
                                            pHddStaCtx->conn_info.bssId, sizeof(tSirMacAddr)))
            {
                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO, "%s:Reassoc BSSID is same as currently associated AP bssid",__func__);
-               ret = -EINVAL;
+               ret = 0;
                goto exit;
            }
 
@@ -3470,7 +3470,9 @@ static int hdd_driver_command(hdd_adapter_t *pAdapter,
            {
                hddLog(VOS_TRACE_LEVEL_ERROR,
                       "%s: Invalid Channel [%d]", __func__, channel);
-               return -EINVAL;
+
+               ret = -EINVAL;
+               goto exit;
            }
 
            /* Proceed with reassoc */
