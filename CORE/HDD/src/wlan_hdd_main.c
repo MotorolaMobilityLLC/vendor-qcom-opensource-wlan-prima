@@ -8526,6 +8526,25 @@ void wlan_hdd_mon_close(hdd_context_t *pHddCtx)
 
    hdd_close_all_adapters( pHddCtx );
 }
+/**
+ * hdd_wlan_free_wiphy_channels - free Channel pointer for wiphy
+ * @ wiphy: the wiphy to validate against
+ *
+ * Return: void
+ */
+void hdd_wlan_free_wiphy_channels(struct wiphy *wiphy)
+{
+    int i =0;
+    for (i = 0; i < IEEE80211_NUM_BANDS; i++)
+    {
+        if (NULL != wiphy->bands[i] &&
+                (NULL != wiphy->bands[i]->channels))
+        {
+            vos_mem_free(wiphy->bands[i]->channels);
+            wiphy->bands[i]->channels = NULL;
+        }
+    }
+}
 /**---------------------------------------------------------------------------
 
   \brief hdd_wlan_exit() - HDD WLAN exit function
@@ -8866,6 +8885,7 @@ free_hdd_ctx:
    if (VOS_FTM_MODE != hdd_get_conparam())
    {
       wiphy_unregister(wiphy) ;
+      hdd_wlan_free_wiphy_channels(wiphy);
    }
    wiphy_free(wiphy) ;
    if (hdd_is_ssr_required())
@@ -10392,6 +10412,8 @@ err_close_adapter:
 err_unregister_wiphy:
 #endif
    wiphy_unregister(wiphy) ;
+   hdd_wlan_free_wiphy_channels(wiphy);
+
 err_vosstop:
    vos_stop(pVosContext);
 

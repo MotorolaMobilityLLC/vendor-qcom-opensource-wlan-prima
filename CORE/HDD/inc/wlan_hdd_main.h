@@ -1724,5 +1724,5 @@ static inline void hdd_init_ll_stat_ctx(void)
     return;
 }
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
-
+void hdd_wlan_free_wiphy_channels(struct wiphy *wiphy);
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )
