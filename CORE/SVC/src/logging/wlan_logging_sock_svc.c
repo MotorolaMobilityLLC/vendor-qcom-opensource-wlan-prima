@@ -1112,6 +1112,7 @@ int wlan_logging_sock_init_svc(void)
 	spin_lock_init(&gwlan_logging.spin_lock);
 	spin_lock_init(&gwlan_logging.data_mgmt_pkt_lock);
 	spin_lock_init(&gwlan_logging.fw_log_pkt_lock);
+	spin_lock_init(&gwlan_logging.thread_stuck_lock);
 	gapp_pid = INVALID_PID;
 	gwlan_logging.pcur_node = NULL;
 
