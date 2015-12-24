@@ -1480,7 +1480,8 @@ int wlan_hdd_tdls_set_peer_caps(hdd_adapter_t *pAdapter,
                                 u8 *mac,
                                 tCsrStaParams *StaParams,
                                 tANI_BOOLEAN isBufSta,
-                                tANI_BOOLEAN isOffChannelSupported)
+                                tANI_BOOLEAN isOffChannelSupported,
+                                tANI_BOOLEAN isQosWmmSta)
 {
     hddTdlsPeer_t *curr_peer;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
@@ -1516,7 +1517,7 @@ int wlan_hdd_tdls_set_peer_caps(hdd_adapter_t *pAdapter,
 
     curr_peer->supported_oper_classes_len =
                StaParams->supported_oper_classes_len;
-    curr_peer->qos = StaParams->capability & CAPABILITIES_QOS_OFFSET;
+    curr_peer->qos = isQosWmmSta;
 
     mutex_unlock(&pHddCtx->tdls_lock);
     return 0;
