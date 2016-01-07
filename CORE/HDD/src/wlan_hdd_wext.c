@@ -176,9 +176,10 @@ static const hdd_freq_chan_map_t freq_chan_map[] = { {2412, 1}, {2417, 2},
 #define  WE_SET_MONITOR_STATE             22
 #define  WE_SET_PROXIMITY_ENABLE          23
 
-#define WE_SET_CHANNEL_RANGE 23   // Motorola, IKJBREL1-4181
-#define WE_SET_IPV6_FILTER_STATE 24 // IKJB42MAIN-1244, Motorola, a19091
-
+// BEGIN IKSWM-15907, Motorola, w18918
+#define WE_SET_CHANNEL_RANGE              90
+#define WE_SET_IPV6_FILTER_STATE          91 
+// END IKSWM-15907, Motorola, w18918
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
