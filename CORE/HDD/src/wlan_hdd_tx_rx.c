@@ -2131,13 +2131,6 @@ VOS_STATUS hdd_tx_fetch_packet_cbk( v_VOID_t *vosContext,
    if( HDD_ETHERTYPE_ARP_SIZE == packet_size )
       pPktMetaInfo->ucIsArp = hdd_IsARP( pVosPacket ) ? 1 : 0;
 
-   if (pPktMetaInfo->ucIsArp)
-   {
-      VOS_TRACE(VOS_MODULE_ID_HDD_DATA, VOS_TRACE_LEVEL_ERROR,
-                "STA TX ARP");
-   }
-
-
 #ifdef FEATURE_WLAN_WAPI
    // Override usIsEapol value when its zero for WAPI case
    pPktMetaInfo->ucIsWai = hdd_IsWAIPacket( pVosPacket ) ? 1 : 0;
