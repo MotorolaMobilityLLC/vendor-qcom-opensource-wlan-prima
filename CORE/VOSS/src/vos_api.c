@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -815,6 +815,7 @@ VOS_STATUS vos_start( v_CONTEXT_t vosContext )
   tSirRetStatus sirStatus     = eSIR_SUCCESS;
   pVosContextType pVosContext = (pVosContextType)vosContext;
   tHalMacStartParameters halStartParams;
+  hdd_context_t *pHddCtx = NULL;
 
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
             "%s: Starting Libra SW", __func__);
@@ -904,6 +905,16 @@ VOS_STATUS vos_start( v_CONTEXT_t vosContext )
   }
   VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
             "%s: WDA correctly started", __func__);
+
+  pHddCtx = (hdd_context_t *)vos_get_context(VOS_MODULE_ID_HDD, pVosContext );
+  if (!pHddCtx)
+  {
+     VOS_TRACE( VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+               "%s: HDD context is null", __func__);
+     goto err_wda_stop;
+  }
+
+  pHddCtx->wifi_turn_on_time_since_boot = vos_get_monotonic_boottime();
 
   /* Start the MAC */
   vos_mem_zero((v_PVOID_t)&halStartParams, sizeof(tHalMacStartParameters));
@@ -2113,7 +2124,7 @@ VOS_STATUS vos_mq_post_message( VOS_MQ_ID msgQueueId, vos_msg_t *pMsg )
 
   vos_mq_put(pTargetMq, pMsgWrapper);
 
-  set_bit(MC_POST_EVENT_MASK, &gpVosContext->vosSched.mcEventFlag);
+  set_bit(MC_POST_EVENT, &gpVosContext->vosSched.mcEventFlag);
   wake_up_interruptible(&gpVosContext->vosSched.mcWaitQueue);
 
   return VOS_STATUS_SUCCESS;
@@ -2257,7 +2268,7 @@ VOS_STATUS vos_mq_post_message_high_pri(VOS_MQ_ID msgQueueId, vos_msg_t *pMsg)
 
   vos_mq_put_front(pTargetMq, pMsgWrapper);
 
-  set_bit(MC_POST_EVENT_MASK, &gpVosContext->vosSched.mcEventFlag);
+  set_bit(MC_POST_EVENT, &gpVosContext->vosSched.mcEventFlag);
   wake_up_interruptible(&gpVosContext->vosSched.mcWaitQueue);
 
   return VOS_STATUS_SUCCESS;
@@ -2384,7 +2395,7 @@ VOS_STATUS vos_tx_mq_serialize( VOS_MQ_ID msgQueueId, vos_msg_t *pMsg )
 
   vos_mq_put(pTargetMq, pMsgWrapper);
 
-  set_bit(TX_POST_EVENT_MASK, &gpVosContext->vosSched.txEventFlag);
+  set_bit(TX_POST_EVENT, &gpVosContext->vosSched.txEventFlag);
   wake_up_interruptible(&gpVosContext->vosSched.txWaitQueue);
 
   return VOS_STATUS_SUCCESS;
@@ -2507,7 +2518,7 @@ VOS_STATUS vos_rx_mq_serialize( VOS_MQ_ID msgQueueId, vos_msg_t *pMsg )
 
   vos_mq_put(pTargetMq, pMsgWrapper);
 
-  set_bit(RX_POST_EVENT_MASK, &gpVosContext->vosSched.rxEventFlag);
+  set_bit(RX_POST_EVENT, &gpVosContext->vosSched.rxEventFlag);
   wake_up_interruptible(&gpVosContext->vosSched.rxWaitQueue);
 
   return VOS_STATUS_SUCCESS;

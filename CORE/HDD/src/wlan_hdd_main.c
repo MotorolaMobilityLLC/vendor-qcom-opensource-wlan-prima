@@ -6516,7 +6516,7 @@ error_register_wext:
    {
       INIT_COMPLETION(pAdapter->session_close_comp_var);
       if (eHAL_STATUS_SUCCESS == sme_CloseSession(pHddCtx->hHal,
-                                    pAdapter->sessionId, VOS_TRUE,
+                                    pAdapter->sessionId, FALSE, VOS_TRUE,
                                     hdd_smeCloseSessionCallback, pAdapter))
       {
          unsigned long rc;
@@ -7486,8 +7486,8 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
          {
             INIT_COMPLETION(pAdapter->session_close_comp_var);
             if (eHAL_STATUS_SUCCESS ==
-                  sme_CloseSession(pHddCtx->hHal, pAdapter->sessionId, VOS_FALSE,
-                     hdd_smeCloseSessionCallback, pAdapter))
+                    sme_CloseSession(pHddCtx->hHal, pAdapter->sessionId, FALSE,
+                      VOS_FALSE, hdd_smeCloseSessionCallback, pAdapter))
             {
                unsigned long ret;
 
@@ -9902,7 +9902,6 @@ int hdd_wlan_startup(struct device *dev )
    pHddCtx->isLoadUnloadInProgress = WLAN_HDD_LOAD_IN_PROGRESS;
 
    vos_set_load_unload_in_progress(VOS_MODULE_ID_VOSS, TRUE);
-   pHddCtx->wifi_turn_on_time_since_boot = vos_get_monotonic_boottime();
 
    /* register for riva power on lock to platform driver
     * Locking power early to ensure FW doesn't reset by kernel while
