@@ -2400,7 +2400,7 @@ static eHalStatus hdd_AssociationCompletionHandler( hdd_adapter_t *pAdapter, tCs
 
         // IKJB42MAIN-1244, Motorola, a19091 - START
         if(pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
-            wlan_hdd_update_v6_filters(pAdapter, (pAdapter->mc_addr_list.mc_cnt==0)?1:0);
+            pAdapter->needs_v6_set = eANI_BOOLEAN_TRUE;
         // IKJB42MAIN-1244, Motorola, a19091 - END
 
         // indicate 'connect' status to userspace
