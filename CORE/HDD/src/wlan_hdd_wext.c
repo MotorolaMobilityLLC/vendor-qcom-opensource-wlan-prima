@@ -9687,6 +9687,10 @@ int wlan_hdd_set_v6_filter(void *pAdapter, v_U8_t set, v_U8_t userSet) {
                  "Not associated - ignoring wlan_hdd_set_v6_filter");
         return ret;
     }
+    if(pTAdapter->needs_v6_set == eANI_BOOLEAN_TRUE) {
+        hddLog(VOS_TRACE_LEVEL_WARN, "Delay v6 set .. skip!");
+        return ret;
+    }
     if(pTAdapter->ipv6_code_set_map == pTAdapter->ipv6_user_set_map  &&
             pTAdapter->ipv6_code_set_map == IPV6_CONFIG_MANDATORY ) {
         hddLog(VOS_TRACE_LEVEL_INFO, "Set IPV6 filter to MANDATORY");
@@ -9766,6 +9770,12 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
         hddLog(VOS_TRACE_LEVEL_INFO, "%s, Re -enabling MC filters",
                 __FUNCTION__);
         wlan_hdd_set_mc_addr_list(pAdapter, TRUE);
+    }
+
+    if(pAdapter->needs_v6_set == eANI_BOOLEAN_TRUE) {
+        hddLog(VOS_TRACE_LEVEL_INFO, "%s, Enabling MC filters after assoc", __FUNCTION__);
+        wlan_hdd_update_v6_filters(pAdapter, (pAdapter->mc_addr_list.mc_cnt==0)?1:0);
+        pAdapter->needs_v6_set = eANI_BOOLEAN_FALSE;
     }
 
     if(pRequest!= NULL)
