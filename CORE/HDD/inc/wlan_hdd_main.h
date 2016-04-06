@@ -1324,6 +1324,7 @@ struct hdd_adapter_s
    v_SCHAR_t filter_v6_index;
    // IKJB42MAIN-1244, Motorola, a19091 - END
    t_multicast_add_list mc_addr_list;
+   v_BOOL_t needs_v6_set;
 #endif
 
    //Magic cookie for adapter sanity verification
