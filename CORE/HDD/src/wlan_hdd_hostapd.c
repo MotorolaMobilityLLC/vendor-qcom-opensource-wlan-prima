@@ -2943,7 +2943,7 @@ int __iw_softap_modify_acl(struct net_device *dev,
     hdd_adapter_t *pHostapdAdapter;
     v_CONTEXT_t pVosContext;
     hdd_context_t *pHddCtx;
-    v_BYTE_t *value = (v_BYTE_t*)extra;
+    char *value = (char *)(wrqu->data.pointer);
     v_U8_t pPeerStaMac[VOS_MAC_ADDR_SIZE];
     int listType, cmd, i;
     int ret = 0; /* success */
