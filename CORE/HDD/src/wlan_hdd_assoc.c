@@ -1033,7 +1033,8 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
     /* HDD has initiated disconnect, do not send disconnect indication
      * to kernel.
      */
-    if (eConnectionState_Disconnecting == pHddStaCtx->conn_info.connState)
+    if ((eConnectionState_Disconnecting == pHddStaCtx->conn_info.connState) ||
+        (eConnectionState_NotConnected == pHddStaCtx->conn_info.connState))
     {
        VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
                    FL(" HDD has initiated a disconnect, no need to send"
@@ -1094,11 +1095,11 @@ static eHalStatus hdd_DisConnectHandler( hdd_adapter_t *pAdapter, tCsrRoamInfo *
                /* To avoid wpa_supplicant sending "HANGED" CMD to ICS UI */
                if ( eCSR_ROAM_LOSTLINK == roamStatus )
                {
-                   cfg80211_disconnected(dev, pRoamInfo->reasonCode, NULL, 0, GFP_KERNEL);
+                   cfg80211_disconnected(dev, pRoamInfo->reasonCode, NULL, 0, true, GFP_KERNEL);
                }
                else
                {
-                   cfg80211_disconnected(dev, WLAN_REASON_UNSPECIFIED, NULL, 0, GFP_KERNEL);
+                   cfg80211_disconnected(dev, WLAN_REASON_UNSPECIFIED, NULL, 0, true, GFP_KERNEL);
                }
             }
 
