@@ -11833,7 +11833,9 @@ static void __hdd_set_multicast_list(struct net_device *dev)
         * Configure the Mcast address list to FW
         * If wlan is already in suspend mode
         */
-       wlan_hdd_set_mc_addr_list(pAdapter, TRUE);
+       //Begin Mot IKLOCSEN-2711 rohita
+       //wlan_hdd_set_mc_addr_list(pAdapter, TRUE);
+       //End IKLOCSEN-2711
    }
    EXIT();
    return;
