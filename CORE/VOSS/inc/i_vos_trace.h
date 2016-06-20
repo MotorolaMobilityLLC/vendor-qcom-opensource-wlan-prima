@@ -152,4 +152,6 @@ void __printf(3,4) vos_snprintf(char *strBuffer, unsigned  int size,
 
 #define VOS_RETURN_ADDRESS  __builtin_return_address(0)
 
+#define VOS_SMP_MB smp_mb()
+
 #endif
