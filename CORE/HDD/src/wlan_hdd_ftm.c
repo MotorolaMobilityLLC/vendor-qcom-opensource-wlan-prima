@@ -3361,6 +3361,15 @@ void wlan_hdd_process_ftm_cmd
         cmd_len -= (sizeof(wlan_hdd_ftm_request_t)- sizeof(pRequestBuf->ftmpkt.ftm_cmd_type));
         pftm_data = pRequestBuf->ftmpkt.pFtmCmd;
 
+#ifdef WLAN_WHITE_LIST
+        //Check if the tcmd data for the FTM access is whitelisted
+        if (vos_is_tcmd_data_white_listed(
+                                    pftm_data, cmd_len) != VOS_STATUS_SUCCESS) {
+            pHddCtx->ftm.pResponseBuf->ftm_err_code = VOS_STATUS_E_PERM;
+            return;
+        }
+#endif
+
         hostState = wlan_hdd_process_ftm_host_cmd(pHddCtx, pftm_data);
         if (0 == hostState)
         {
@@ -3444,6 +3453,43 @@ void wlan_hdd_process_ftm_cmd
     EXIT();
     return;
 } /* wlan_adp_ftm_cmd() */
+
+
+/**---------------------------------------------------------------------------
+
+  \brief vos_is_tcmd_data_white_listed() -
+
+   This function is used white list the factory commands for user builds
+
+  \param  - data - Pointer raw data which needs to be send to FTM.
+          - len  - length of the paylod
+
+  \return - 0 for success, non zero for failure
+
+  --------------------------------------------------------------------------*/
+VOS_STATUS vos_is_tcmd_data_white_listed(u_int8_t *data, int len)
+{
+       //_OP_TX = Tx command
+       int iteration = 0;
+       u_int8_t whitelist_read_tx
+                      [WLAN_FTM_WHITE_LIST_CMD][WLAN_FTM_WHITE_LIST_BYTE] = {
+                          {0x50, 0x30}, /*set RF channel */
+                          {0x4F, 0x30}, /*set internal configuration */
+                          {0xC9, 0x32}, /*enable scpc mode */
+                          {0x81, 0x30}, /*set data rate preamble frame */
+                                        /*number spacing and playlod   */
+                          {0x82, 0x30}, /*set Tx Power */
+                          {0xA5, 0x30}  /*turn on and off Tx */
+                      };
+
+       for (iteration = 0; iteration < WLAN_FTM_WHITE_LIST_CMD; ++iteration) {
+           if ((vos_mem_compare(data,
+                       &whitelist_read_tx[iteration][0], 2) == VOS_TRUE)) {
+                return VOS_STATUS_SUCCESS;
+           }
+       }
+       return VOS_STATUS_E_PERM;
+}
 
 /**---------------------------------------------------------------------------
 
