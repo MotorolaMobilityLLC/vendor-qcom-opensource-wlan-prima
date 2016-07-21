@@ -701,6 +701,21 @@ ifeq ($(CONFIG_PRIMA_WLAN_LFR_MBB),y)
 CDEFINES += -DWLAN_FEATURE_LFR_MBB
 endif
 
+# WLAN_WHITE_LIST - WLAN Radiated Power Test
+# For user software build, wlan driver needs to allow the factory
+# commnds only for Tx_opcode and NART commands based off 12M doc
+# commans whitelisted are :
+# set RF channel
+# set internal configuration
+# enable scpc mode
+# set data rate preamble frame number spacinf and playlod
+# set Tx Power
+# turn on Tx
+# turn off Tx
+ifeq ($(TARGET_BUILD_VARIANT),user)
+CDEFINES += -DWLAN_WHITE_LIST
+endif
+
 ifeq ($(CONFIG_PRIMA_WLAN_OKC),y)
 CDEFINES += -DFEATURE_WLAN_OKC
 endif

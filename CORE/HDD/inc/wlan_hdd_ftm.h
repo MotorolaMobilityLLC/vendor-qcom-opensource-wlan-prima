@@ -38,6 +38,9 @@
 #define WLAN_FTM_SUCCESS   0
 #define WLAN_FTM_FAILURE   1
 
+#define WLAN_FTM_WHITE_LIST_CMD  6
+#define WLAN_FTM_WHITE_LIST_BYTE 2
+
 #define WLAN_FTM_START              1
 #define WLAN_FTM_STOP               2        
 #define WLAN_FTM_CMD                3
@@ -220,5 +223,5 @@ typedef struct rateStr2rateIndex_s
 int wlan_hdd_ftm_open(hdd_context_t *pHddCtx);
 void wlan_hdd_process_ftm_cmd (hdd_context_t *pHddCtx,tAniNlHdr *wnl);
 int wlan_hdd_ftm_close(hdd_context_t *pHddCtx);
-
+VOS_STATUS vos_is_tcmd_data_white_listed(u_int8_t *data, int len);
 #endif
