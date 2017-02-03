@@ -50,8 +50,8 @@ ifneq ($(CONFIG_PRONTO_WLAN),)
 
 # To enable CONFIG_QCOM_ESE_UPLOAD, dependent config
 # CONFIG_QCOM_ESE must be enabled.
-CONFIG_QCOM_ESE := n
-CONFIG_QCOM_ESE_UPLOAD := n
+CONFIG_QCOM_ESE := y
+CONFIG_QCOM_ESE_UPLOAD := y
 
 # Feature flags which are not (currently) configurable via Kconfig
 
