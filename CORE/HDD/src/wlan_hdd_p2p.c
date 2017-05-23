@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -132,9 +132,8 @@ static void hdd_sendMgmtFrameOverMonitorIface( hdd_adapter_t *pMonAdapter,
                                                tANI_U8* pbFrames,
                                                tANI_U8 frameType );
 
-static v_BOOL_t hdd_p2p_is_action_type_rsp( const u8 *buf )
+static v_BOOL_t wlan_hdd_is_type_p2p_action( const u8 *buf )
 {
-    tActionFrmType actionFrmType;
     const u8 *ouiPtr;
 
     if ( buf[WLAN_HDD_PUBLIC_ACTION_FRAME_CATEGORY_OFFSET] !=
@@ -158,14 +157,23 @@ static v_BOOL_t hdd_p2p_is_action_type_rsp( const u8 *buf )
         return VOS_FALSE;
     }
 
-    actionFrmType = buf[WLAN_HDD_PUBLIC_ACTION_FRAME_SUB_TYPE_OFFSET];
-    if ( actionFrmType != WLAN_HDD_INVITATION_REQ &&
-        actionFrmType != WLAN_HDD_GO_NEG_REQ &&
-        actionFrmType != WLAN_HDD_DEV_DIS_REQ &&
-        actionFrmType != WLAN_HDD_PROV_DIS_REQ )
-        return VOS_TRUE;
-    else
-        return VOS_FALSE;
+    return VOS_TRUE;
+}
+
+static bool hdd_p2p_is_action_type_rsp( const u8 *buf )
+{
+    tActionFrmType actionFrmType;
+
+    if ( wlan_hdd_is_type_p2p_action(buf) )
+    {
+        actionFrmType = buf[WLAN_HDD_PUBLIC_ACTION_FRAME_SUB_TYPE_OFFSET];
+        if ( actionFrmType != WLAN_HDD_INVITATION_REQ &&
+            actionFrmType != WLAN_HDD_GO_NEG_REQ &&
+            actionFrmType != WLAN_HDD_DEV_DIS_REQ &&
+            actionFrmType != WLAN_HDD_PROV_DIS_REQ )
+            return VOS_TRUE;
+    }
+    return VOS_FALSE;
 }
 
 eHalStatus wlan_hdd_remain_on_channel_callback( tHalHandle hHal, void* pCtx,
@@ -1293,7 +1301,7 @@ int __wlan_hdd_mgmt_tx( struct wiphy *wiphy, struct net_device *dev,
 
     if ((type == SIR_MAC_MGMT_FRAME) &&
             (subType == SIR_MAC_MGMT_ACTION) &&
-            (buf[WLAN_HDD_PUBLIC_ACTION_FRAME_OFFSET] == WLAN_HDD_PUBLIC_ACTION_FRAME))
+            wlan_hdd_is_type_p2p_action(&buf[WLAN_HDD_PUBLIC_ACTION_FRAME_BODY_OFFSET]))
     {
         actionFrmType = buf[WLAN_HDD_PUBLIC_ACTION_FRAME_TYPE_OFFSET];
 #ifdef WLAN_FEATURE_P2P_DEBUG
@@ -2453,7 +2461,9 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
 
     /* Get pAdapter from Destination mac address of the frame */
     if ((type == SIR_MAC_MGMT_FRAME) &&
-            (subType != SIR_MAC_MGMT_PROBE_REQ))
+        (subType != SIR_MAC_MGMT_PROBE_REQ) &&
+        !vos_is_macaddr_broadcast(
+         (v_MACADDR_t *)&pbFrames[WLAN_HDD_80211_FRM_DA_OFFSET]))
     {
          pAdapter = hdd_get_adapter_by_macaddr( WLAN_HDD_GET_CTX(pAdapter),
                             &pbFrames[WLAN_HDD_80211_FRM_DA_OFFSET]);
@@ -2702,17 +2712,17 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
     //Indicate Frame Over Normal Interface
     hddLog( LOG1, FL("Indicate Frame over NL80211 Interface"));
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,18,0))
-    cfg80211_rx_mgmt(pAdapter->dev->ieee80211_ptr, freq, 0, pbFrames,
+    cfg80211_rx_mgmt(pAdapter->dev->ieee80211_ptr, freq, rxRssi * 100, pbFrames,
                      nFrameLength, NL80211_RXMGMT_FLAG_ANSWERED);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,12,0))
-    cfg80211_rx_mgmt(pAdapter->dev->ieee80211_ptr, freq, 0, pbFrames,
+    cfg80211_rx_mgmt(pAdapter->dev->ieee80211_ptr, freq, rxRssi * 100, pbFrames,
                      nFrameLength, NL80211_RXMGMT_FLAG_ANSWERED, GFP_ATOMIC);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
-    cfg80211_rx_mgmt( pAdapter->dev->ieee80211_ptr, freq, 0,
+    cfg80211_rx_mgmt( pAdapter->dev->ieee80211_ptr, freq, rxRssi * 100,
                       pbFrames, nFrameLength,
                       GFP_ATOMIC );
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
-    cfg80211_rx_mgmt( pAdapter->dev, freq, 0,
+    cfg80211_rx_mgmt( pAdapter->dev, freq, rxRssi * 100,
                       pbFrames, nFrameLength,
                       GFP_ATOMIC );
 #else

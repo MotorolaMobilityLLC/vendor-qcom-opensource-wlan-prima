@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -3056,6 +3056,8 @@ static VOS_STATUS wlan_hdd_handle_fastreassoc(hdd_adapter_t *pAdapter,
 	hdd_station_ctx_t *pHddStaCtx = NULL;
 	hdd_context_t *pHddCtx = NULL;
 	int ret;
+	tCsrRoamModifyProfileFields mod_profile_fields;
+	uint32_t roam_id = 0;
 	pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
@@ -3076,8 +3078,12 @@ static VOS_STATUS wlan_hdd_handle_fastreassoc(hdd_adapter_t *pAdapter,
 	if (vos_mem_compare(targetApBssid,
 				pHddStaCtx->conn_info.bssId,
 				sizeof(tSirMacAddr))) {
+		sme_GetModifyProfileFields(pHddCtx->hHal, pAdapter->sessionId,
+						&mod_profile_fields);
+		sme_RoamReassoc(pHddCtx->hHal, pAdapter->sessionId, NULL,
+				mod_profile_fields, &roam_id, 1);
 		hddLog(LOG1, FL("Reassoc BSSID is same as currently associated AP bssid"));
-		return eHAL_STATUS_FAILURE;
+		return eHAL_STATUS_SUCCESS;
 	}
 
 	/* Check channel number is a valid channel number */
@@ -8679,7 +8685,7 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
          pAdapter->device_mode = session_type;
 
          hdd_initialize_adapter_common(pAdapter);
-         status = hdd_init_ap_mode(pAdapter);
+         status = hdd_init_ap_mode(pAdapter, false);
          if( VOS_STATUS_SUCCESS != status )
             goto err_free_netdev;
 
@@ -8822,13 +8828,14 @@ hdd_adapter_t* hdd_open_adapter( hdd_context_t *pHddCtx, tANI_U8 session_type,
    if(VOS_STATUS_SUCCESS == status)
    {
       wlan_hdd_set_concurrency_mode(pHddCtx, session_type);
-
       //Initialize the WoWL service
       if(!hdd_init_wowl(pAdapter))
       {
           hddLog(VOS_TRACE_LEVEL_FATAL,"%s: hdd_init_wowl failed",__func__);
           goto err_free_netdev;
       }
+      //Initialize the TSF capture data
+      wlan_hdd_tsf_init(pAdapter);
    }
    return pAdapter;
 
@@ -8964,6 +8971,18 @@ void wlan_hdd_reset_prob_rspies(hdd_adapter_t* pHostapdAdapter)
     }
 }
 
+VOS_STATUS hdd_cleanup_ap_events(hdd_adapter_t *adapter)
+{
+#ifdef DHCP_SERVER_OFFLOAD
+    vos_event_destroy(&adapter->dhcp_status.vos_event);
+#endif
+#ifdef MDNS_OFFLOAD
+    vos_event_destroy(&adapter->mdns_status.vos_event);
+#endif
+    return VOS_STATUS_SUCCESS;
+}
+
+
 VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
                              const v_BOOL_t bCloseSession )
 {
@@ -9008,6 +9027,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
          if( hdd_connIsConnected(pstation) ||
              (pstation->conn_info.connState == eConnectionState_Connecting) )
          {
+            INIT_COMPLETION(pAdapter->disconnect_comp_var);
             if (pWextState->roamProfile.BSSType == eCSR_BSS_TYPE_START_IBSS)
                 halStatus = sme_RoamDisconnect(pHddCtx->hHal,
                                              pAdapter->sessionId,
@@ -9134,6 +9154,7 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
           }
 
          //Any softap specific cleanup here...
+         hdd_cleanup_ap_events(pAdapter);
          if (pAdapter->device_mode == WLAN_HDD_P2P_GO) {
             while (pAdapter->is_roc_inprogress) {
                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
@@ -9154,6 +9175,10 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
 
             vos_flush_delayed_work(&pAdapter->roc_work);
          }
+#ifdef SAP_AUTH_OFFLOAD
+         if (pHddCtx->cfg_ini->enable_sap_auth_offload)
+             hdd_set_sap_auth_offload(pAdapter, FALSE);
+#endif
          mutex_lock(&pHddCtx->sap_lock);
          if (test_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags)) 
          {
@@ -9217,6 +9242,151 @@ VOS_STATUS hdd_stop_adapter( hdd_context_t *pHddCtx, hdd_adapter_t *pAdapter,
    EXIT();
    return VOS_STATUS_SUCCESS;
 }
+
+/**
+ * wlan_hdd_restart_sap() - to restart SAP in driver internally
+ * @ap_adapter: - Pointer to SAP hdd_adapter_t structure
+ *
+ * wlan_hdd_restart_sap first delete SAP and do cleanup.
+ * After that WLANSAP_StartBss start re-start process of SAP.
+ *
+ * Return: None
+ */
+static void wlan_hdd_restart_sap(hdd_adapter_t *ap_adapter)
+{
+    hdd_ap_ctx_t *pHddApCtx;
+    hdd_hostapd_state_t *pHostapdState;
+    VOS_STATUS vos_status;
+    hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(ap_adapter);
+#ifdef CFG80211_DEL_STA_V2
+    struct station_del_parameters delStaParams;
+#endif
+    tsap_Config_t *pConfig;
+
+    pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+    pConfig = &pHddApCtx->sapConfig;
+
+    mutex_lock(&pHddCtx->sap_lock);
+    if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+#ifdef CFG80211_DEL_STA_V2
+        delStaParams.mac = NULL;
+        delStaParams.subtype = SIR_MAC_MGMT_DEAUTH >> 4;
+        delStaParams.reason_code = eCsrForcedDeauthSta;
+        wlan_hdd_cfg80211_del_station(ap_adapter->wdev.wiphy, ap_adapter->dev,
+                                      &delStaParams);
+#else
+        wlan_hdd_cfg80211_del_station(ap_adapter->wdev.wiphy, ap_adapter->dev,
+                                      NULL);
+#endif
+        hdd_cleanup_actionframe(pHddCtx, ap_adapter);
+
+        pHostapdState = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+        vos_event_reset(&pHostapdState->vosEvent);
+
+        if (VOS_STATUS_SUCCESS == WLANSAP_StopBss(pHddCtx->pvosContext)) {
+            vos_status = vos_wait_single_event(&pHostapdState->vosEvent,
+                                               10000);
+            if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+                hddLog(LOGE, FL("SAP Stop Failed"));
+                goto end;
+            }
+        }
+        clear_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+        wlan_hdd_decr_active_session(pHddCtx, ap_adapter->device_mode);
+        hddLog(LOG1, FL("SAP Stop Success"));
+
+        if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+            hddLog(LOGE, FL("SAP Not able to set AP IEs"));
+            goto end;
+        }
+
+        if (WLANSAP_StartBss(pHddCtx->pvosContext, hdd_hostapd_SAPEventCB,
+            pConfig, (v_PVOID_t)ap_adapter->dev) != VOS_STATUS_SUCCESS) {
+            hddLog(LOGE, FL("SAP Start Bss fail"));
+            goto end;
+        }
+
+        hddLog(LOG1, FL("Waiting for SAP to start"));
+        vos_status = vos_wait_single_event(&pHostapdState->vosEvent, 10000);
+        if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+            hddLog(LOGE, FL("SAP Start failed"));
+            goto end;
+        }
+        hddLog(LOG1, FL("SAP Start Success"));
+        set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+        wlan_hdd_incr_active_session(pHddCtx, ap_adapter->device_mode);
+        pHostapdState->bCommit = TRUE;
+        if (!VOS_IS_STATUS_SUCCESS(hdd_dhcp_mdns_offload(ap_adapter))) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, FL("DHCP/MDNS offload Failed!!"));
+            vos_event_reset(&pHostapdState->vosEvent);
+            if (VOS_STATUS_SUCCESS == WLANSAP_StopBss(pHddCtx->pvosContext)) {
+                vos_status = vos_wait_single_event(&pHostapdState->vosEvent,
+                                                   10000);
+                if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+                    hddLog(LOGE, FL("SAP Stop Failed"));
+                    goto end;
+                }
+            }
+        }
+    }
+end:
+    mutex_unlock(&pHddCtx->sap_lock);
+    return;
+}
+
+/**
+ * __hdd_sap_restart_handle() - to handle restarting of SAP
+ * @work: name of the work
+ *
+ * Purpose of this function is to trigger sap start. this function
+ * will be called from workqueue.
+ *
+ * Return: void.
+ */
+static void __hdd_sap_restart_handle(struct work_struct *work)
+{
+    hdd_adapter_t *sap_adapter;
+    hdd_context_t *hdd_ctx = container_of(work,
+                                          hdd_context_t,
+                                          sap_start_work);
+    if (0 != wlan_hdd_validate_context(hdd_ctx)) {
+        vos_ssr_unprotect(__func__);
+        return;
+    }
+    sap_adapter = hdd_get_adapter(hdd_ctx,
+                                  WLAN_HDD_SOFTAP);
+    if (sap_adapter == NULL) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  FL("sap_adapter is NULL"));
+        vos_ssr_unprotect(__func__);
+        return;
+    }
+
+    if (hdd_ctx->is_ch_avoid_in_progress) {
+        sap_adapter->sessionCtx.ap.sapConfig.channel = AUTO_CHANNEL_SELECT;
+        wlan_hdd_restart_sap(sap_adapter);
+        hdd_change_ch_avoidance_status(hdd_ctx, false);
+    }
+    if (hdd_ctx->cfg_ini->enable_sap_auth_offload)
+        wlan_hdd_restart_sap(sap_adapter);
+}
+
+/**
+ * hdd_sap_restart_handle() - to handle restarting of SAP
+ * @work: name of the work
+ *
+ * Purpose of this function is to trigger sap start. this function
+ * will be called from workqueue.
+ *
+ * Return: void.
+ */
+static void hdd_sap_restart_handle(struct work_struct *work)
+{
+    vos_ssr_protect(__func__);
+    __hdd_sap_restart_handle(work);
+    vos_ssr_unprotect(__func__);
+}
+
 
 VOS_STATUS hdd_stop_all_adapters( hdd_context_t *pHddCtx )
 {
@@ -9300,7 +9470,18 @@ VOS_STATUS hdd_reset_all_adapters( hdd_context_t *pHddCtx )
       pAdapter = pAdapterNode->pAdapter;
       hddLog(VOS_TRACE_LEVEL_INFO, FL("Disabling queues"));
       netif_tx_disable(pAdapter->dev);
-      netif_carrier_off(pAdapter->dev);
+
+      if (pHddCtx->cfg_ini->sap_internal_restart &&
+              pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+          hddLog(LOG1, FL("driver supports sap restart"));
+          vos_flush_work(&pHddCtx->sap_start_work);
+          hdd_sap_indicate_disconnect_for_sta(pAdapter);
+          hdd_cleanup_actionframe(pHddCtx, pAdapter);
+          hdd_softap_deinit_tx_rx(pAdapter, true);
+          hdd_sap_destroy_timers(pAdapter);
+      } else {
+          netif_carrier_off(pAdapter->dev);
+      }
 
       pAdapter->sessionCtx.station.hdd_ReassocScenario = VOS_FALSE;
 
@@ -9348,6 +9529,113 @@ VOS_STATUS hdd_reset_all_adapters( hdd_context_t *pHddCtx )
 
    return VOS_STATUS_SUCCESS;
 }
+
+/**
+ * hdd_get_bss_entry() - Get the bss entry matching the chan, bssid and ssid
+ * @wiphy: wiphy
+ * @channel: channel of the BSS to find
+ * @bssid: bssid of the BSS to find
+ * @ssid: ssid of the BSS to find
+ * @ssid_len: ssid len of of the BSS to find
+ *
+ * The API is a wrapper to get bss from kernel matching the chan,
+ * bssid and ssid
+ *
+ * Return: Void
+ */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)) \
+    && !defined(WITH_BACKPORTS) && !defined(IEEE80211_PRIVACY)
+
+struct cfg80211_bss* hdd_get_bss_entry(struct wiphy *wiphy,
+      struct ieee80211_channel *channel,
+      const u8 *bssid,
+      const u8 *ssid, size_t ssid_len)
+{
+   return cfg80211_get_bss(wiphy, channel, bssid,
+           ssid, ssid_len,
+           WLAN_CAPABILITY_ESS,
+           WLAN_CAPABILITY_ESS);
+}
+#else
+struct cfg80211_bss* hdd_get_bss_entry(struct wiphy *wiphy,
+      struct ieee80211_channel *channel,
+      const u8 *bssid,
+      const u8 *ssid, size_t ssid_len)
+{
+   return cfg80211_get_bss(wiphy, channel, bssid,
+           ssid, ssid_len,
+           IEEE80211_BSS_TYPE_ESS,
+           IEEE80211_PRIVACY_ANY);
+}
+#endif
+
+/**
+ * hdd_connect_result() - API to send connection status to supplicant
+ * @dev: network device
+ * @bssid: bssid to which we want to associate
+ * @roam_info: information about connected bss
+ * @req_ie: Request Information Element
+ * @req_ie_len: len of the req IE
+ * @resp_ie: Response IE
+ * @resp_ie_len: len of ht response IE
+ * @status: status
+ * @gfp: Kernel Flag
+ *
+ * The API is a wrapper to send connection status to supplicant
+ *
+ * Return: Void
+ */
+#if defined CFG80211_CONNECT_BSS
+void hdd_connect_result(struct net_device *dev,
+    const u8 *bssid,
+    tCsrRoamInfo *roam_info,
+    const u8 *req_ie,
+    size_t req_ie_len,
+    const u8 *resp_ie,
+    size_t resp_ie_len,
+    u16 status,
+    gfp_t gfp)
+{
+   hdd_adapter_t *padapter = (hdd_adapter_t *) netdev_priv(dev);
+   struct cfg80211_bss *bss = NULL;
+
+   if (WLAN_STATUS_SUCCESS == status) {
+       struct ieee80211_channel *chan;
+       int freq;
+       int chan_no = roam_info->pBssDesc->channelId;;
+
+       if (chan_no <= 14)
+           freq = ieee80211_channel_to_frequency(chan_no,
+                  IEEE80211_BAND_2GHZ);
+       else
+           freq = ieee80211_channel_to_frequency(chan_no,
+                  IEEE80211_BAND_5GHZ);
+
+       chan = ieee80211_get_channel(padapter->wdev.wiphy, freq);
+       bss = hdd_get_bss_entry(padapter->wdev.wiphy,
+              chan, bssid,
+              roam_info->u.pConnectedProfile->SSID.ssId,
+              roam_info->u.pConnectedProfile->SSID.length);
+   }
+
+   cfg80211_connect_bss(dev, bssid, bss, req_ie, req_ie_len,
+        resp_ie, resp_ie_len, status, gfp);
+}
+#else
+void hdd_connect_result(struct net_device *dev,
+   const u8 *bssid,
+   tCsrRoamInfo *roam_info,
+   const u8 *req_ie,
+   size_t req_ie_len,
+   const u8 * resp_ie,
+   size_t resp_ie_len,
+   u16 status,
+   gfp_t gfp)
+{
+   cfg80211_connect_result(dev, bssid, req_ie, req_ie_len,
+         resp_ie, resp_ie_len, status, gfp);
+}
+#endif
 
 VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
 {
@@ -9405,7 +9693,7 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
                * Indicate connect failure to supplicant if we were in the
                * process of connecting
                */
-               cfg80211_connect_result(pAdapter->dev, NULL,
+               hdd_connect_result(pAdapter->dev, NULL, NULL,
                                        NULL, 0, NULL, 0,
                                        WLAN_STATUS_ASSOC_DENIED_UNSPEC,
                                        GFP_KERNEL);
@@ -9413,7 +9701,15 @@ VOS_STATUS hdd_start_all_adapters( hdd_context_t *pHddCtx )
             break;
 
          case WLAN_HDD_SOFTAP:
-            /* softAP can handle SSR */
+            if (pHddCtx->cfg_ini->sap_internal_restart) {
+                hdd_init_ap_mode(pAdapter, true);
+                status = hdd_sta_id_hash_attach(pAdapter);
+                if (VOS_STATUS_SUCCESS != status)
+                {
+                    hddLog(VOS_TRACE_LEVEL_FATAL,
+                         FL("failed to attach hash for"));
+                }
+            }
             break;
 
          case WLAN_HDD_P2P_GO:
@@ -10401,6 +10697,8 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
        vos_timer_stop(&pHddCtx->tdls_source_timer);
    }
 
+   vos_set_snoc_high_freq_voting(false);
+
    vos_timer_destroy(&pHddCtx->tdls_source_timer);
 
    //Disable IMPS/BMPS as we do not want the device to enter any power
@@ -10565,6 +10863,7 @@ void hdd_wlan_exit(hdd_context_t *pHddCtx)
    hdd_close_all_adapters( pHddCtx );
 
    vos_flush_delayed_work(&pHddCtx->spoof_mac_addr_work);
+   vos_flush_work(&pHddCtx->sap_start_work);
 
 free_hdd_ctx:
    /* free the power on lock from platform driver */
@@ -11520,8 +11819,8 @@ int hdd_wlan_startup(struct device *dev )
    ((VosContextType*)(pVosContext))->pHDDContext = (v_VOID_t*)pHddCtx;
 
    pHddCtx->parent_dev = dev;
-   pHddCtx->last_scan_reject_session_id = 0;
-   pHddCtx->last_scan_reject_reason = 0xFF;
+   pHddCtx->last_scan_reject_session_id = 0xFF;
+   pHddCtx->last_scan_reject_reason = 0;
    pHddCtx->last_scan_reject_timestamp = 0;
 
    init_completion(&pHddCtx->full_pwr_comp_var);
@@ -11537,6 +11836,7 @@ int hdd_wlan_startup(struct device *dev )
 
 
    hdd_init_ll_stats_ctx(pHddCtx);
+   hdd_init_nud_stats_ctx(pHddCtx);
 
 #ifdef CONFIG_ENABLE_LINUX_REG
    init_completion(&pHddCtx->linux_reg_req);
@@ -11549,11 +11849,13 @@ int hdd_wlan_startup(struct device *dev )
 #endif /* WLAN_FEATURE_EXTSCAN */
 
    spin_lock_init(&pHddCtx->schedScan_lock);
+   vos_spin_lock_init(&pHddCtx->sap_update_info_lock);
 
    hdd_list_init( &pHddCtx->hddAdapters, MAX_NUMBER_OF_ADAPTERS );
 
    vos_init_delayed_work(&pHddCtx->spoof_mac_addr_work,
                                 hdd_processSpoofMacAddrRequest);
+   vos_init_work(&pHddCtx->sap_start_work, hdd_sap_restart_handle);
 
 #ifdef FEATURE_WLAN_TDLS
    /* tdls_lock is initialized before an hdd_open_adapter ( which is
@@ -11630,14 +11932,11 @@ int hdd_wlan_startup(struct device *dev )
    /*
     * cfg80211: Initialization  ...
     */
-   if (VOS_FTM_MODE != hdd_get_conparam())
+   if (0 < wlan_hdd_cfg80211_init(dev, wiphy, pHddCtx->cfg_ini))
    {
-      if (0 < wlan_hdd_cfg80211_init(dev, wiphy, pHddCtx->cfg_ini))
-      {
-         hddLog(VOS_TRACE_LEVEL_FATAL,
-                 "%s: wlan_hdd_cfg80211_init return failure", __func__);
-         goto err_config;
-      }
+      hddLog(VOS_TRACE_LEVEL_FATAL,
+              "%s: wlan_hdd_cfg80211_init return failure", __func__);
+      goto err_config;
    }
 
    // Update VOS trace levels based upon the cfg.ini
@@ -11711,7 +12010,7 @@ int hdd_wlan_startup(struct device *dev )
       if(!VOS_IS_STATUS_SUCCESS( status ))
       {
          hddLog(VOS_TRACE_LEVEL_FATAL,"%s: vos_watchdog_open failed",__func__);
-         goto err_wdclose;
+         goto err_config;
       }
    }
 
@@ -12241,6 +12540,13 @@ int hdd_wlan_startup(struct device *dev )
 
 #endif
 
+#ifdef SAP_AUTH_OFFLOAD
+   if (!sme_IsFeatureSupportedByFW(SAP_OFFLOADS))
+   {
+       hddLog(VOS_TRACE_LEVEL_INFO, FL(" SAP AUTH OFFLOAD not supp by FW"));
+       pHddCtx->cfg_ini->enable_sap_auth_offload = 0;
+   }
+#endif
 
    if (vos_is_multicast_logging())
        wlan_logging_set_log_level();
@@ -12348,6 +12654,8 @@ int hdd_wlan_startup(struct device *dev )
    }
 #endif
 
+   vos_mem_set((uint8_t *)&pHddCtx->bad_sta, HDD_MAX_STA_COUNT, 0);
+
    // Register IPv4 notifier to notify if any change in IP
    // So that we can reconfigure the offload parameters
    pHddCtx->ipv4_notifier.notifier_call = wlan_hdd_ipv4_changed;
@@ -12363,6 +12671,11 @@ int hdd_wlan_startup(struct device *dev )
    /*Fw mem dump procfs initialization*/
    memdump_init();
    hdd_dp_util_send_rps_ind(pHddCtx);
+
+   pHddCtx->is_ap_mode_wow_supported =
+              sme_IsFeatureSupportedByFW(SAP_MODE_WOW);
+
+   hdd_assoc_registerFwdEapolCB(pVosContext);
 
    goto success;
 
@@ -14577,10 +14890,1835 @@ void hdd_initialize_adapter_common(hdd_adapter_t *pAdapter)
         init_completion(&pAdapter->hdd_set_batch_scan_req_var);
         init_completion(&pAdapter->hdd_get_batch_scan_req_var);
 #endif
+        init_completion(&pAdapter->wlan_suspend_comp_var);
 
         return;
 }
 
+#ifdef MDNS_OFFLOAD
+
+/**
+ * hdd_mdns_enable_offload_done() - mdns enable offload response api
+ * @padapter: holds adapter
+ * @status: response status
+ *
+ * Return - None
+ */
+void hdd_mdns_enable_offload_done(void *padapter, VOS_STATUS status)
+{
+    hdd_adapter_t* adapter = (hdd_adapter_t*) padapter;
+
+    ENTER();
+
+    if (NULL == adapter)
+    {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               "%s: adapter is NULL",__func__);
+        return;
+    }
+
+    adapter->mdns_status.mdns_enable_status = status;
+    vos_event_set(&adapter->mdns_status.vos_event);
+    return;
+}
+
+/**
+ * hdd_mdns_fqdn_offload_done() - mdns fqdn offload response api
+ * @padapter: holds adapter
+ * @status: responce status
+ *
+ * Return - None
+ */
+void hdd_mdns_fqdn_offload_done(void *padapter, VOS_STATUS status)
+{
+    hdd_adapter_t* adapter = (hdd_adapter_t*) padapter;
+
+    ENTER();
+
+    if (NULL == adapter)
+    {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               "%s: adapter is NULL",__func__);
+        return;
+    }
+
+    adapter->mdns_status.mdns_fqdn_status = status;
+    return;
+}
+
+/**
+ * hdd_mdns_resp_offload_done() - mdns resp offload response api
+ * @padapter: holds adapter
+ * @status: responce status
+ *
+ * Return - None
+ */
+void hdd_mdns_resp_offload_done(void *padapter, VOS_STATUS status)
+{
+    hdd_adapter_t* adapter = (hdd_adapter_t*) padapter;
+
+    ENTER();
+
+    if (NULL == adapter)
+    {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               "%s: adapter is NULL",__func__);
+        return;
+    }
+
+    adapter->mdns_status.mdns_resp_status = status;
+    return;
+}
+
+/**
+ * wlan_hdd_mdns_process_response_dname() - Process mDNS domain name
+ * @response: Pointer to a struct hdd_mdns_resp_info
+ * @resp_info: Pointer to a struct tSirMDNSResponseInfo
+ *
+ * This function will pack the whole domain name without compression. It will
+ * add the leading len for each field and add zero length octet to terminate
+ * the domain name.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_process_response_dname(struct hdd_mdns_resp_info *response,
+                     sir_mdns_resp_info resp_info)
+{
+    uint8_t  num;
+    uint16_t idx;
+    uint8_t len = 0;
+
+    if ((response == NULL) || (response->data == NULL) ||
+        (response->offset == NULL)) {
+        hddLog(LOGE, FL("Either data or offset in response is NULL!"));
+        return FALSE;
+    }
+
+    if ((resp_info == NULL) ||
+        (resp_info->resp_len >= MAX_MDNS_RESP_LEN)) {
+        hddLog(LOGE, FL("resp_len exceeds %d!"), MAX_MDNS_RESP_LEN);
+        return FALSE;
+    }
+
+    for (num = 0; num < response->num_entries; num++) {
+        response->offset[num] =
+                    resp_info->resp_len + MDNS_HEADER_LEN;
+        idx = num * MAX_LEN_DOMAINNAME_FIELD;
+        len = strlen((char *)&response->data[idx]);
+        if ((resp_info->resp_len + len + 1) >= MAX_MDNS_RESP_LEN) {
+            hddLog(LOGE, FL("resp_len exceeds %d!"),
+                MAX_MDNS_RESP_LEN);
+            return FALSE;
+                }
+        resp_info->resp_data[resp_info->resp_len] = len;
+        resp_info->resp_len++;
+        vos_mem_copy(&resp_info->resp_data[resp_info->resp_len],
+                &response->data[idx], len);
+        resp_info->resp_len += len;
+    }
+
+    /* The domain name terminates with the zero length octet */
+    if (num == response->num_entries) {
+        if (resp_info->resp_len >= MAX_MDNS_RESP_LEN) {
+            hddLog(LOGE, FL("resp_len exceeds %d!"),
+                MAX_MDNS_RESP_LEN);
+            return FALSE;
+        }
+        resp_info->resp_data[resp_info->resp_len] = 0;
+        resp_info->resp_len++;
+    }
+
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_format_response_u16() - Form uint16_t response data
+ * @value: The uint16_t value is formed to the struct tSirMDNSResponseInfo
+ * @resp_info: Pointer to a struct tSirMDNSResponseInfo
+ *
+ * Return: None
+ */
+static void wlan_hdd_mdns_format_response_u16(uint16_t value,
+                          sir_mdns_resp_info resp_info)
+{
+    uint8_t val_u8;
+
+    if ((resp_info == NULL) || (resp_info->resp_data == NULL))
+        return;
+    val_u8 = (value & 0xff00) >> 8;
+    resp_info->resp_data[resp_info->resp_len++] = val_u8;
+    val_u8 = value & 0xff;
+    resp_info->resp_data[resp_info->resp_len++] = val_u8;
+}
+
+/**
+ * wlan_hdd_mdns_format_response_u32() - Form uint32_t response data
+ * @value: The uint32_t value is formed to the struct tSirMDNSResponseInfo
+ * @resp_info: Pointer to a struct tSirMDNSResponseInfo
+ *
+ * Return: None
+ */
+static void wlan_hdd_mdns_format_response_u32(uint32_t value,
+                          sir_mdns_resp_info resp_info)
+{
+    uint8_t val_u8;
+
+    if ((resp_info == NULL) || (resp_info->resp_data == NULL))
+        return;
+    val_u8 = (value & 0xff000000) >> 24;
+    resp_info->resp_data[resp_info->resp_len++] = val_u8;
+    val_u8 = (value & 0xff0000) >> 16;
+    resp_info->resp_data[resp_info->resp_len++] = val_u8;
+    val_u8 = (value & 0xff00) >> 8;
+    resp_info->resp_data[resp_info->resp_len++] = val_u8;
+    val_u8 = value & 0xff;
+    resp_info->resp_data[resp_info->resp_len++] = val_u8;
+}
+
+/**
+ * wlan_hdd_mdns_process_response_misc() - Process misc info in mDNS response
+ * @resp_type: Response type for mDNS
+ * @resp_info: Pointer to a struct tSirMDNSResponseInfo
+ *
+ * This function will pack the response type, class and TTL (Time To Live).
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool wlan_hdd_mdns_process_response_misc(uint16_t resp_type,
+                        sir_mdns_resp_info resp_info)
+{
+    uint16_t len;
+
+    if (resp_info == NULL) {
+        hddLog(LOGE, FL("resp_info is NULL!"));
+        return FALSE;
+    }
+
+    len = resp_info->resp_len + (2 * sizeof(uint16_t) + sizeof(uint32_t));
+    if (len >= MAX_MDNS_RESP_LEN) {
+        hddLog(LOGE, FL("resp_len exceeds %d!"), MAX_MDNS_RESP_LEN);
+        return FALSE;
+    }
+
+    /* Fill Type, Class, TTL */
+    wlan_hdd_mdns_format_response_u16(resp_type, resp_info);
+    wlan_hdd_mdns_format_response_u16(MDNS_CLASS, resp_info);
+    wlan_hdd_mdns_format_response_u32(MDNS_TTL, resp_info);
+
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_compress_data() - Compress the domain name in mDNS response
+ * @resp_info: Pointer to a struct tSirMDNSResponseInfo
+ * @response_dst: The response which domain name is compressed.
+ * @response_src: The response which domain name is matched with response_dst.
+ *                Its offset is used for data compression.
+ * @num_matched: The number of matched entries between response_dst and
+ *               response_src
+ *
+ * This function will form the different fields of domain name in response_dst
+ * if any. Then use the offset of the matched domain name in response_src to
+ * compress the matched domain name.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_compress_data(sir_mdns_resp_info resp_info,
+                struct hdd_mdns_resp_info *response_dst,
+                struct hdd_mdns_resp_info *response_src,
+                uint8_t num_matched)
+{
+    uint8_t  num, num_diff;
+    uint16_t value, idx;
+    uint8_t len = 0;
+
+    if ((response_src == NULL) || (response_dst == NULL) ||
+        (resp_info == NULL)) {
+        hddLog(LOGE, FL("response info is NULL!"));
+        return FALSE;
+    }
+
+    if (response_dst->num_entries < num_matched) {
+        hddLog(LOGE, FL("num_entries is less than num_matched!"));
+        return FALSE;
+    }
+
+    if (resp_info->resp_len >= MAX_MDNS_RESP_LEN) {
+        hddLog(LOGE, FL("resp_len exceeds %d!"), MAX_MDNS_RESP_LEN);
+        return FALSE;
+    }
+
+    num_diff = response_dst->num_entries - num_matched;
+    if ((num_diff > 0) && (response_dst->data == NULL)) {
+        hddLog(LOGE, FL("response_dst->data is NULL!"));
+        return FALSE;
+    }
+
+    /*
+    * Handle the unmatched string at the beginning
+    * Store the length of octets and the octets
+    */
+    for (num = 0; num < num_diff; num++) {
+        response_dst->offset[num] =
+            resp_info->resp_len + MDNS_HEADER_LEN;
+        idx = num * MAX_LEN_DOMAINNAME_FIELD;
+        len = strlen((char *)&response_dst->data[idx]);
+        if ((resp_info->resp_len + len + 1) >= MAX_MDNS_RESP_LEN) {
+            hddLog(LOGE, FL("resp_len exceeds %d!"),
+                MAX_MDNS_RESP_LEN);
+            return FALSE;
+        }
+        resp_info->resp_data[resp_info->resp_len] = len;
+        resp_info->resp_len++;
+        vos_mem_copy(&resp_info->resp_data[resp_info->resp_len],
+            &response_dst->data[idx], len);
+        resp_info->resp_len += len;
+    }
+    /*
+    * Handle the matched string from the end
+    * Just keep the offset and mask the leading two bit
+    */
+    if (response_src->num_entries >= num_matched) {
+        num_diff = response_src->num_entries - num_matched;
+        value = response_src->offset[num_diff];
+        if (value > 0) {
+            value |= 0xc000;
+            if ((resp_info->resp_len + sizeof(uint16_t)) >=
+                MAX_MDNS_RESP_LEN) {
+                hddLog(LOGE, FL("resp_len exceeds %d!"),
+                    MAX_MDNS_RESP_LEN);
+                return FALSE;
+            }
+            wlan_hdd_mdns_format_response_u16(value, resp_info);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/**
+ * wlan_hdd_mdns_reset_response() - Reset the response info
+ * @response: The response which info is reset.
+ *
+ * Return: None
+ */
+static void wlan_hdd_mdns_reset_response(struct hdd_mdns_resp_info *response)
+{
+    if (response == NULL)
+        return;
+    response->num_entries = 0;
+    response->data = NULL;
+    response->offset = NULL;
+}
+
+/**
+ * wlan_hdd_mdns_init_response() - Initialize the response info
+ * @response: The response which info is initiatized.
+ * @resp_dname: The domain name string which might be tokenized.
+ *
+ * This function will allocate the memory for both response->data and
+ * response->offset. Besides, it will also tokenize the domain name to some
+ * entries and fill response->num_entries with the num of entries.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool wlan_hdd_mdns_init_response(struct hdd_mdns_resp_info *response,
+                    uint8_t *resp_dname, char separator)
+{
+    uint16_t size;
+
+    if ((resp_dname == NULL) || (response == NULL)) {
+        hddLog(LOGE, FL("resp_dname or response is NULL!"));
+        return FALSE;
+    }
+
+    size = MAX_NUM_FIELD_DOMAINNAME * MAX_LEN_DOMAINNAME_FIELD;
+    response->data = vos_mem_malloc(size);
+    if (response->data) {
+        vos_mem_zero(response->data, size);
+        if (VOS_STATUS_SUCCESS !=
+            hdd_string_to_string_array((char *)resp_dname,
+                        response->data,
+                        separator,
+                        &response->num_entries,
+                        MAX_NUM_FIELD_DOMAINNAME,
+                        MAX_LEN_DOMAINNAME_FIELD)) {
+            hddLog(LOGE, FL("hdd_string_to_string_array fail!"));
+            goto err_init_resp;
+        }
+
+        if ((response->num_entries > 0) &&
+            (strlen((char *)&response->data[0]) > 0)) {
+            size = sizeof(uint16_t) * response->num_entries;
+            response->offset = vos_mem_malloc(size);
+            if (response->offset) {
+                vos_mem_zero(response->offset, size);
+                return TRUE;
+            }
+        }
+    }
+
+err_init_resp:
+    if (response->data)
+        vos_mem_free(response->data);
+    wlan_hdd_mdns_reset_response(response);
+    return FALSE;
+}
+
+/**
+ * wlan_hdd_mdns_find_entries_from_end() - Find the matched entries
+ * @response1: The response info is used to be compared.
+ * @response2: The response info is used to be compared.
+ *
+ * This function will find the matched entries from the end.
+ *
+ * Return: Return the number of the matched entries.
+ */
+static uint8_t
+wlan_hdd_mdns_find_entries_from_end(struct hdd_mdns_resp_info *response1,
+                    struct hdd_mdns_resp_info *response2)
+{
+    uint8_t  min, len1, i;
+    uint16_t  num1, num2;
+    uint8_t num_matched = 0;
+
+    min = VOS_MIN(response1->num_entries, response2->num_entries);
+
+    for (i = 1; i <= min; i++) {
+        num1 = (response1->num_entries - i);
+        num1 *= MAX_LEN_DOMAINNAME_FIELD;
+        num2 = (response2->num_entries - i);
+        num2 *= MAX_LEN_DOMAINNAME_FIELD;
+        len1 = strlen((char *)&response1->data[num1]);
+
+        if ((len1 == 0) ||
+            (len1 != strlen((char *)&response2->data[num2])))
+            break;
+        if (memcmp(&response1->data[num1],
+            &response2->data[num2], len1))
+            break;
+        else
+            num_matched++;
+    }
+
+    return num_matched;
+}
+
+/**
+ * wlan_hdd_mdns_find_max() - Find the maximum number of the matched entries
+ * @matchedlist: Pointer to the array of struct hdd_mdns_resp_matched
+ * @numlist: The number of the elements in the array matchedlist.
+ *
+ * Find the max number of the matched entries among the array matchedlist.
+ *
+ * Return: None
+ */
+static void wlan_hdd_mdns_find_max(struct hdd_mdns_resp_matched *matchedlist,
+                   uint8_t numlist)
+{
+    int j;
+    struct hdd_mdns_resp_matched tmp;
+
+    /* At least two values are used for sorting */
+    if ((numlist < 2) || (matchedlist == NULL)) {
+        hddLog(LOGE, FL("At least two values are used for sorting!"));
+        return;
+    }
+
+    for (j = 0; j < numlist-1; j++) {
+        if (matchedlist[j].num_matched >
+            matchedlist[j+1].num_matched) {
+            vos_mem_copy(&tmp, &matchedlist[j],
+                    sizeof(struct hdd_mdns_resp_matched));
+            vos_mem_copy(&matchedlist[j], &matchedlist[j+1],
+                    sizeof(struct hdd_mdns_resp_matched));
+            vos_mem_copy(&matchedlist[j+1], &tmp,
+                    sizeof(struct hdd_mdns_resp_matched));
+        }
+    }
+}
+
+/**
+ * wlan_hdd_mdns_pack_response_type_a() - Pack Type A response
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ * @resptype_a: Pointer to the struct hdd_mdns_resp_info of Type A
+ *
+ * Type A response include QName, response type, class, TTL and Ipv4.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_pack_response_type_a(hdd_config_t *ini_config,
+                   sir_mdns_resp_info resp_info,
+                   struct hdd_mdns_resp_info *resptype_a)
+{
+    uint16_t value;
+    uint32_t len;
+
+    ENTER();
+    if ((ini_config == NULL) || (resp_info == NULL) ||
+        (resptype_a == NULL)) {
+        hddLog(LOGE, FL("ini_config or response info is NULL!"));
+        return FALSE;
+    }
+
+    /* No Type A response */
+    if (strlen((char *)ini_config->mdns_resp_type_a) <= 0)
+        return TRUE;
+
+    /* Wrong response is assigned, just ignore this response */
+    if (!wlan_hdd_mdns_init_response(resptype_a,
+                    ini_config->mdns_resp_type_a, '.'))
+        return TRUE;
+
+    /* Process response domain name */
+    if (!wlan_hdd_mdns_process_response_dname(resptype_a, resp_info)) {
+        hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+            MDNS_TYPE_A);
+        return FALSE;
+    }
+
+    /* Process response Type, Class, TTL */
+    if (!wlan_hdd_mdns_process_response_misc(MDNS_TYPE_A, resp_info)) {
+        hddLog(LOGE, FL("Fail to process mDNS misc response (%d)!"),
+            MDNS_TYPE_A);
+        return FALSE;
+    }
+
+    /* Process response RDLength, RData */
+    len = sizeof(uint16_t) + sizeof(uint32_t);
+    len += resp_info->resp_len;
+    if (len >= MAX_MDNS_RESP_LEN) {
+        hddLog(LOGE, FL("resp_len exceeds %d!"), MAX_MDNS_RESP_LEN);
+        return FALSE;
+    }
+    value = sizeof(uint32_t);
+    wlan_hdd_mdns_format_response_u16(value, resp_info);
+    wlan_hdd_mdns_format_response_u32(ini_config->mdns_resp_type_a_ipv4,
+                    resp_info);
+
+    EXIT();
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_pack_response_type_txt() - Pack Type Txt response
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ * @resptype_txt: Pointer to the struct hdd_mdns_resp_info of Type txt
+ * @resptype_a: Pointer to the struct hdd_mdns_resp_info of Type A
+ *
+ * Type Txt response include QName, response type, class, TTL and text content.
+ * Also, it will find the matched QName from resptype_A and compress the data.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_pack_response_type_txt(hdd_config_t *ini_config,
+                     sir_mdns_resp_info resp_info,
+                     struct hdd_mdns_resp_info *resptype_txt,
+                     struct hdd_mdns_resp_info *resptype_a)
+{
+    uint8_t num_matched;
+    uint8_t num;
+    uint16_t idx;
+    uint16_t value = 0;
+    uint32_t len;
+    uint32_t total_len;
+    bool status;
+    struct hdd_mdns_resp_info resptype_content;
+
+    ENTER();
+
+    if ((ini_config == NULL) || (resp_info == NULL) ||
+        (resptype_txt == NULL)) {
+        hddLog(LOGE, FL("ini_config or response info is NULL!"));
+        return FALSE;
+    }
+
+    /* No Type Txt response */
+    if (strlen((char *)ini_config->mdns_resp_type_txt) <= 0)
+        return TRUE;
+
+    /* Wrong response is assigned, just ignore this response */
+    if (!wlan_hdd_mdns_init_response(resptype_txt,
+                ini_config->mdns_resp_type_txt, '.'))
+        return TRUE;
+
+    /*
+    * For data compression
+    * Check if any strings are matched with Type A response
+    */
+    if (resptype_a && (resptype_a->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_txt,
+                                resptype_a);
+        if (num_matched > 0) {
+            if (!wlan_hdd_mdns_compress_data(resp_info,
+                resptype_txt, resptype_a, num_matched)) {
+                hddLog(LOGE, FL("Fail to compress mDNS "
+                    "response (%d)!"), MDNS_TYPE_TXT);
+                return FALSE;
+            }
+        } else {
+            /*
+            * num_matched is zero. Error!
+            * At least ".local" is needed.
+            */
+            hddLog(LOGE, FL("No matched string! Fail to pack mDNS "
+                    "response (%d)!"), MDNS_TYPE_TXT);
+            return FALSE;
+        }
+    } else {
+        /* no TypeA response, so show the whole data */
+        if (!wlan_hdd_mdns_process_response_dname(resptype_txt,
+                            resp_info)) {
+            hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+                MDNS_TYPE_TXT);
+            return FALSE;
+        }
+    }
+
+    /* Process response Type, Class, TTL */
+    if (!wlan_hdd_mdns_process_response_misc(MDNS_TYPE_TXT, resp_info)) {
+        hddLog(LOGE, FL("Fail to process mDNS misc response (%d)!"),
+            MDNS_TYPE_TXT);
+        return FALSE;
+    }
+
+    /*
+    * Process response RDLength, RData.
+    * TypeTxt RData include len.
+    */
+    status = wlan_hdd_mdns_init_response(&resptype_content,
+                ini_config->mdns_resp_type_txt_content,
+                '/');
+    if (status == FALSE) {
+        hddLog(LOGE, FL("wlan_hdd_mdns_init_response FAIL"));
+        return FALSE;
+    }
+
+    for (num = 0; num < resptype_content.num_entries; num++) {
+        idx = num * MAX_LEN_DOMAINNAME_FIELD;
+        value += strlen((char *)&resptype_content.data[idx]);
+    }
+
+    /* content len is uint16_t */
+    total_len = sizeof(uint16_t);
+    total_len += resp_info->resp_len + value +
+        resptype_content.num_entries;
+
+    if (total_len >= MAX_MDNS_RESP_LEN) {
+        hddLog(LOGE, FL("resp_len exceeds %d!"), MAX_MDNS_RESP_LEN);
+        return FALSE;
+    }
+    wlan_hdd_mdns_format_response_u16(value + resptype_content.num_entries,
+                        resp_info);
+
+    for (num = 0; num < resptype_content.num_entries; num++) {
+        idx = num * MAX_LEN_DOMAINNAME_FIELD;
+        len = strlen((char *)&resptype_content.data[idx]);
+        resp_info->resp_data[resp_info->resp_len] = len;
+        resp_info->resp_len++;
+
+        vos_mem_copy(&resp_info->resp_data[resp_info->resp_len],
+            &resptype_content.data[idx], len);
+
+        resp_info->resp_len += len;
+        hddLog(LOG1, FL("index = %d, len = %d, str = %s"),
+            num, len, &resptype_content.data[idx]);
+    }
+
+    EXIT();
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_pack_response_type_ptr_dname() - Pack Type PTR domain name
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ * @resptype_ptr_dn: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ *                     domain name
+ * @resptype_ptr: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ * @resptype_txt: Pointer to the struct hdd_mdns_resp_info of Type Txt
+ * @resptype_a: Pointer to the struct hdd_mdns_resp_info of Type A
+ *
+ * The Type Ptr response include Type PTR domain name in its data field.
+ * Also, it will find the matched QName from the existing resptype_ptr,
+ * resptype_txt, resptype_a and then compress the data.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_pack_response_type_ptr_dname(hdd_config_t *ini_config,
+                   sir_mdns_resp_info resp_info,
+                   struct hdd_mdns_resp_info *resptype_ptr_dn,
+                   struct hdd_mdns_resp_info *resptype_ptr,
+                   struct hdd_mdns_resp_info *resptype_txt,
+                   struct hdd_mdns_resp_info *resptype_a)
+{
+    uint8_t  num_matched, numlist, size;
+    struct hdd_mdns_resp_matched matchedlist[MAX_MDNS_RESP_TYPE-1];
+    struct hdd_mdns_resp_info *resp;
+
+    if ((ini_config == NULL) || (resp_info == NULL) ||
+        (resptype_ptr == NULL) || (resptype_ptr_dn == NULL)) {
+        hddLog(LOGE, FL("ini_config or response info is NULL!"));
+        return FALSE;
+    }
+
+    /* No Type Ptr domain name response */
+    if (strlen((char *)ini_config->mdns_resp_type_ptr_dname) <= 0)
+        return TRUE;
+
+    /* Wrong response is assigned, just ignore this response */
+    if (!wlan_hdd_mdns_init_response(resptype_ptr_dn,
+                ini_config->mdns_resp_type_ptr_dname, '.'))
+        return TRUE;
+
+    /*
+    * For data compression
+    * Check if any strings are matched with previous
+    * response.
+    */
+    numlist = 0;
+    size = (MAX_MDNS_RESP_TYPE-1);
+    size *= sizeof(struct hdd_mdns_resp_matched);
+    vos_mem_zero(matchedlist, size);
+    num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_ptr_dn,
+                            resptype_ptr);
+    if (num_matched > 0) {
+        matchedlist[numlist].num_matched = num_matched;
+        matchedlist[numlist].type = MDNS_TYPE_PTR;
+        numlist++;
+    }
+    if (resptype_txt && (resptype_txt->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(
+                    resptype_ptr_dn, resptype_txt);
+        if (num_matched > 0) {
+            matchedlist[numlist].num_matched = num_matched;
+            matchedlist[numlist].type = MDNS_TYPE_TXT;
+            numlist++;
+        }
+    }
+    if (resptype_a && (resptype_a->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(
+                    resptype_ptr_dn,resptype_a);
+        if (num_matched > 0) {
+            matchedlist[numlist].num_matched = num_matched;
+            matchedlist[numlist].type = MDNS_TYPE_A;
+            numlist++;
+        }
+    }
+    if (numlist > 0) {
+        if (numlist > 1)
+            wlan_hdd_mdns_find_max(matchedlist, numlist);
+        resp = NULL;
+        switch (matchedlist[numlist-1].type) {
+        case MDNS_TYPE_A:
+            resp = resptype_a;
+            break;
+        case MDNS_TYPE_TXT:
+            resp = resptype_txt;
+            break;
+        case MDNS_TYPE_PTR:
+            resp = resptype_ptr;
+            break;
+        default:
+            hddLog(LOGE, FL("Fail to compress mDNS response "
+                    "(%d)!"), MDNS_TYPE_PTR_DNAME);
+            return FALSE;
+        }
+        num_matched = matchedlist[numlist-1].num_matched;
+        if (!wlan_hdd_mdns_compress_data(resp_info, resptype_ptr_dn,
+                        resp, num_matched)) {
+            hddLog(LOGE, FL("Fail to compress mDNS response "
+                    "(%d)!"), MDNS_TYPE_PTR_DNAME);
+            return FALSE;
+        }
+    } else {
+        /* num = 0 -> no matched string */
+        if (!wlan_hdd_mdns_process_response_dname(resptype_ptr_dn,
+                            resp_info)) {
+            hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+                    MDNS_TYPE_PTR_DNAME);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_pack_response_type_ptr() - Pack Type PTR response
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ * @resptype_ptr: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ * @resptype_ptr_dn: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ *                     domain name
+ * @resptype_txt: Pointer to the struct hdd_mdns_resp_info of Type Txt
+ * @resptype_a: Pointer to the struct hdd_mdns_resp_info of Type A
+ *
+ * The Type Ptr response include QName, response type, class, TTL and
+ * Type PTR domain name. Also, it will find the matched QName from the
+ * existing resptype_txt, resptype_a and then compress the data.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_pack_response_type_ptr(hdd_config_t *ini_config,
+                 sir_mdns_resp_info resp_info,
+                 struct hdd_mdns_resp_info *resptype_ptr,
+                 struct hdd_mdns_resp_info *resptype_ptr_dn,
+                 struct hdd_mdns_resp_info *resptype_txt,
+                 struct hdd_mdns_resp_info *resptype_a)
+{
+    uint8_t num_matched, num_matched1;
+    uint16_t value;
+    uint8_t val_u8;
+    uint32_t offset_data_len, len;
+
+    ENTER();
+    if ((ini_config == NULL) || (resp_info == NULL) ||
+        (resptype_ptr == NULL) || (resptype_ptr_dn == NULL)) {
+        hddLog(LOGE, FL("ini_config or response info is NULL!"));
+        return FALSE;
+    }
+
+    /* No Type Ptr response */
+    if (strlen((char *)ini_config->mdns_resp_type_ptr) <= 0)
+        return TRUE;
+
+    /* Wrong response is assigned, just ignore this response */
+    if (!wlan_hdd_mdns_init_response(resptype_ptr,
+                    ini_config->mdns_resp_type_ptr, '.'))
+        return TRUE;
+
+    /*
+    * For data compression
+    * Check if any strings are matched with Type A response
+    */
+    num_matched  = 0;
+    num_matched1 = 0;
+    if (resptype_a && (resptype_a->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_ptr,
+                                resptype_a);
+    }
+    if (resptype_txt && (resptype_txt->num_entries > 0)) {
+        num_matched1 = wlan_hdd_mdns_find_entries_from_end(
+                        resptype_ptr, resptype_txt);
+    }
+    if ((num_matched != num_matched1) ||
+        ((num_matched > 0) && (num_matched1 > 0))) {
+        if (num_matched >= num_matched1) {
+            if (!wlan_hdd_mdns_compress_data(resp_info,
+                resptype_ptr, resptype_a, num_matched)) {
+                hddLog(LOGE, FL("Fail to compress mDNS "
+                    "response (%d)!"), MDNS_TYPE_PTR);
+                return FALSE;
+            }
+        } else {
+            /* num_matched is less than num_matched1 */
+            if (!wlan_hdd_mdns_compress_data(resp_info,
+                resptype_ptr, resptype_txt, num_matched1)) {
+                hddLog(LOGE, FL("Fail to compress mDNS "
+                    "response (%d)!"), MDNS_TYPE_PTR);
+                return FALSE;
+            }
+        }
+    } else {
+        /*
+        * Both num_matched and num_matched1 are zero.
+        * no TypeA & TypeTxt
+        */
+        if (!wlan_hdd_mdns_process_response_dname(resptype_ptr,
+                            resp_info)) {
+            hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+                MDNS_TYPE_PTR);
+            return FALSE;
+        }
+    }
+
+    /* Process response Type, Class, TTL */
+    if (!wlan_hdd_mdns_process_response_misc(MDNS_TYPE_PTR, resp_info)) {
+        hddLog(LOGE, FL("Fail to process mDNS misc response (%d)!"),
+            MDNS_TYPE_PTR);
+        return FALSE;
+    }
+
+    /*
+    * Process response RDLength, RData (Ptr domain name)
+    * Save the offset of RData length
+    */
+    offset_data_len = resp_info->resp_len;
+    resp_info->resp_len += sizeof(uint16_t);
+
+    if (!wlan_hdd_mdns_pack_response_type_ptr_dname(ini_config, resp_info,
+                        resptype_ptr_dn, resptype_ptr,
+                        resptype_txt, resptype_a)) {
+        return FALSE;
+    }
+    /* Set the RData length */
+    len = offset_data_len + sizeof(uint16_t);
+    if ((resptype_ptr_dn->num_entries > 0) &&
+        (resp_info->resp_len > len)) {
+        value = resp_info->resp_len - len;
+        val_u8 = (value & 0xff00) >> 8;
+        resp_info->resp_data[offset_data_len] = val_u8;
+        val_u8 = value & 0xff;
+        resp_info->resp_data[offset_data_len+1] = val_u8;
+    } else {
+        hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+            MDNS_TYPE_PTR);
+        return FALSE;
+    }
+
+    EXIT();
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_pack_response_type_srv_target()- Pack Type Service Target
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ * @resptype_srv_tgt: Pointer to the struct hdd_mdns_resp_info of Type Srv
+ *                      target
+ * @resptype_srv: Pointer to the struct hdd_mdns_resp_info of Type Srv
+ * @resptype_ptr: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ * @resptype_ptr_dn: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ *                     domain name
+ * @resptype_txt: Pointer to the struct hdd_mdns_resp_info of Type Txt
+ * @resptype_a: Pointer to the struct hdd_mdns_resp_info of Type A
+ *
+ * The Type service target is one of the data field in the Type SRV response.
+ * Also, it will find the matched QName from the existing resptype_srv,
+ * resptype_ptr, resptype_ptr_dn, resptype_txt, resptype_a and then compress
+ * the data.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_pack_response_type_srv_target(hdd_config_t *ini_config,
+                sir_mdns_resp_info resp_info,
+                struct hdd_mdns_resp_info *resptype_srv_tgt,
+                struct hdd_mdns_resp_info *resptype_srv,
+                struct hdd_mdns_resp_info *resptype_ptr,
+                struct hdd_mdns_resp_info *resptype_ptr_dn,
+                struct hdd_mdns_resp_info *resptype_txt,
+                struct hdd_mdns_resp_info *resptype_a)
+{
+    uint8_t  num_matched, num, size;
+    struct hdd_mdns_resp_matched matchedlist[MAX_MDNS_RESP_TYPE-1];
+    struct hdd_mdns_resp_info *resp;
+
+    if ((ini_config == NULL) || (resp_info == NULL) ||
+        (resptype_srv == NULL) || (resptype_srv_tgt == NULL)) {
+        hddLog(LOGE, FL("ini_config or response info is NULL!"));
+        return FALSE;
+    }
+
+    /* No Type Srv Target response */
+    if (strlen((char *)ini_config->mdns_resp_type_srv_target) <= 0)
+        return TRUE;
+
+    /* Wrong response is assigned, just ignore this response */
+    if (!wlan_hdd_mdns_init_response(resptype_srv_tgt,
+                ini_config->mdns_resp_type_srv_target, '.'))
+        return TRUE;
+
+    /*
+    * For data compression
+    * Check if any strings are matched with previous response.
+    */
+    num = 0;
+    size = (MAX_MDNS_RESP_TYPE-1);
+    size *= sizeof(struct hdd_mdns_resp_matched);
+    vos_mem_zero(matchedlist, size);
+    num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_srv_tgt,
+                            resptype_srv);
+    if (num_matched > 0) {
+        matchedlist[num].num_matched = num_matched;
+        matchedlist[num].type = MDNS_TYPE_SRV;
+        num++;
+    }
+    if (resptype_ptr && (resptype_ptr->num_entries > 0)) {
+        if (resptype_ptr_dn && (resptype_ptr_dn->num_entries > 0)) {
+            num_matched = wlan_hdd_mdns_find_entries_from_end(
+                    resptype_srv_tgt, resptype_ptr_dn);
+            if (num_matched > 0) {
+                matchedlist[num].num_matched = num_matched;
+                matchedlist[num].type = MDNS_TYPE_PTR_DNAME;
+                num++;
+            }
+        }
+        num_matched = wlan_hdd_mdns_find_entries_from_end(
+                    resptype_srv_tgt, resptype_ptr);
+        if (num_matched > 0) {
+            matchedlist[num].num_matched = num_matched;
+            matchedlist[num].type = MDNS_TYPE_PTR;
+            num++;
+        }
+    }
+    if (resptype_txt && (resptype_txt->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(
+                    resptype_srv_tgt, resptype_txt);
+        if (num_matched > 0) {
+            matchedlist[num].num_matched = num_matched;
+            matchedlist[num].type = MDNS_TYPE_TXT;
+            num++;
+        }
+    }
+    if (resptype_a && (resptype_a->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(
+                    resptype_srv_tgt, resptype_a);
+        if (num_matched > 0) {
+            matchedlist[num].num_matched = num_matched;
+            matchedlist[num].type = MDNS_TYPE_A;
+            num++;
+        }
+    }
+    if (num > 0) {
+        if (num > 1)
+            wlan_hdd_mdns_find_max(matchedlist, num);
+        resp = NULL;
+        switch (matchedlist[num-1].type) {
+        case MDNS_TYPE_A:
+            resp = resptype_a;
+            break;
+        case MDNS_TYPE_TXT:
+            resp = resptype_txt;
+            break;
+        case MDNS_TYPE_PTR:
+            resp = resptype_ptr;
+            break;
+        case MDNS_TYPE_PTR_DNAME:
+            resp = resptype_ptr_dn;
+            break;
+        case MDNS_TYPE_SRV:
+            resp = resptype_srv;
+            break;
+        default:
+            hddLog(LOGE, FL("Fail to compress mDNS response "
+                    "(%d)!"), MDNS_TYPE_SRV_TARGET);
+            return FALSE;
+        }
+        num_matched = matchedlist[num-1].num_matched;
+        if (!wlan_hdd_mdns_compress_data(resp_info, resptype_srv_tgt,
+                        resp, num_matched)) {
+            hddLog(LOGE, FL("Fail to compress mDNS response "
+                    "(%d)!"), MDNS_TYPE_SRV_TARGET);
+            return FALSE;
+        }
+    } else {
+        /* num = 0 -> no matched string */
+        if (!wlan_hdd_mdns_process_response_dname(resptype_srv_tgt,
+                            resp_info)) {
+            hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+                    MDNS_TYPE_SRV_TARGET);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_pack_response_type_srv()- Pack Type Service response
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ * @resptype_srv: Pointer to the struct hdd_mdns_resp_info of Type Srv
+ * @resptype_srv_tgt: Pointer to the struct hdd_mdns_resp_info of Type Srv
+ *                      target
+ * @resptype_ptr: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ * @resptype_ptr_dn: Pointer to the struct hdd_mdns_resp_info of Type Ptr
+ *                     domain name
+ * @resptype_txt: Pointer to the struct hdd_mdns_resp_info of Type Txt
+ * @resptype_a: Pointer to the struct hdd_mdns_resp_info of Type A
+ *
+ * The Type SRV (Service) response include QName, response type, class, TTL
+ * and four kinds of data fields. Also, it will find the matched QName from
+ * the existing resptype_ptr, resptype_ptr_dn, resptype_txt, resptype_a and
+ * then compress the data.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool
+wlan_hdd_mdns_pack_response_type_srv(hdd_config_t *ini_config,
+                 sir_mdns_resp_info resp_info,
+                 struct hdd_mdns_resp_info *resptype_srv,
+                 struct hdd_mdns_resp_info *resptype_srv_tgt,
+                 struct hdd_mdns_resp_info *resptype_ptr,
+                 struct hdd_mdns_resp_info *resptype_ptr_dn,
+                 struct hdd_mdns_resp_info *resptype_txt,
+                 struct hdd_mdns_resp_info *resptype_a)
+{
+    uint8_t num_matched, num, size;
+    uint16_t value;
+    uint8_t val_u8;
+    uint32_t offset_data_len, len;
+    struct hdd_mdns_resp_info *resp;
+    struct hdd_mdns_resp_matched matchedlist[MAX_MDNS_RESP_TYPE-1];
+
+    ENTER();
+
+    if ((ini_config == NULL) || (resp_info == NULL) ||
+        (resptype_srv == NULL) || (resptype_srv_tgt == NULL)) {
+        hddLog(LOGE, FL("ini_config or response info is NULL!"));
+        return FALSE;
+    }
+
+    /* No Type Srv response */
+    if (strlen((char *)ini_config->mdns_resp_type_srv) <= 0)
+        return TRUE;
+
+    /* Wrong response is assigned, just ignore this response */
+    if (!wlan_hdd_mdns_init_response(resptype_srv,
+                    ini_config->mdns_resp_type_srv, '.'))
+        return TRUE;
+
+    /*
+    * For data compression
+    * Check if any strings are matched with Type A response
+    */
+    num = 0;
+    size = (MAX_MDNS_RESP_TYPE-1);
+    size *= sizeof(struct hdd_mdns_resp_matched);
+    vos_mem_zero(matchedlist, size);
+    if (resptype_ptr && (resptype_ptr->num_entries > 0)) {
+        if (resptype_ptr_dn && (resptype_ptr_dn->num_entries > 0)) {
+            num_matched = wlan_hdd_mdns_find_entries_from_end(
+                            resptype_srv,
+                            resptype_ptr_dn);
+            if (num_matched > 0) {
+                matchedlist[num].num_matched = num_matched;
+                matchedlist[num].type =    MDNS_TYPE_PTR_DNAME;
+                num++;
+            }
+        }
+        num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_srv,
+                                resptype_ptr);
+        if (num_matched > 0) {
+            matchedlist[num].num_matched = num_matched;
+            matchedlist[num].type = MDNS_TYPE_PTR;
+            num++;
+        }
+    }
+    if (resptype_txt && (resptype_txt->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_srv,
+                                resptype_txt);
+        if (num_matched > 0) {
+            matchedlist[num].num_matched =num_matched;
+            matchedlist[num].type = MDNS_TYPE_TXT;
+            num++;
+        }
+    }
+    if (resptype_a && (resptype_a->num_entries > 0)) {
+        num_matched = wlan_hdd_mdns_find_entries_from_end(resptype_srv,
+                                resptype_a);
+        if (num_matched > 0) {
+            matchedlist[num].num_matched = num_matched;
+            matchedlist[num].type = MDNS_TYPE_A;
+            num++;
+        }
+    }
+    if (num > 0) {
+        if (num > 1)
+            wlan_hdd_mdns_find_max(matchedlist, num);
+        resp = NULL;
+        switch (matchedlist[num-1].type) {
+        case MDNS_TYPE_A:
+            resp = resptype_a;
+            break;
+        case MDNS_TYPE_TXT:
+            resp = resptype_txt;
+            break;
+        case MDNS_TYPE_PTR:
+            resp = resptype_ptr;
+            break;
+        case MDNS_TYPE_PTR_DNAME:
+            resp = resptype_ptr_dn;
+            break;
+        default:
+            hddLog(LOGE, FL("Fail to compress mDNS response "
+                    "(%d)!"), MDNS_TYPE_SRV);
+            return FALSE;
+        }
+        num_matched = matchedlist[num-1].num_matched;
+        if (!wlan_hdd_mdns_compress_data(resp_info, resptype_srv,
+                        resp, num_matched)) {
+            hddLog(LOGE, FL("Fail to compress mDNS response "
+                    "(%d)!"), MDNS_TYPE_SRV);
+            return FALSE;
+        }
+    } else {
+        /* num = 0 -> no matched string */
+        if (!wlan_hdd_mdns_process_response_dname(resptype_srv,
+                            resp_info)) {
+            hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+                    MDNS_TYPE_SRV);
+            return FALSE;
+        }
+    }
+
+    /* Process response Type, Class, TTL */
+    if (!wlan_hdd_mdns_process_response_misc(MDNS_TYPE_SRV, resp_info)) {
+        hddLog(LOGE, FL("Fail to process mDNS misc response (%d)!"),
+                    MDNS_TYPE_SRV);
+        return FALSE;
+    }
+
+    /*
+    * Process response RDLength, RData (Srv target name)
+    * Save the offset of RData length
+    */
+    offset_data_len = resp_info->resp_len;
+    resp_info->resp_len += sizeof(uint16_t);
+
+    len = resp_info->resp_len + (3 * sizeof(uint16_t));
+    if (len >= MAX_MDNS_RESP_LEN) {
+        hddLog(LOGE, FL("resp_len exceeds %d!"), MAX_MDNS_RESP_LEN);
+        return FALSE;
+    }
+
+    /* set Srv Priority */
+    value = ini_config->mdns_resp_type_srv_priority;
+    wlan_hdd_mdns_format_response_u16(value, resp_info);
+    /* set Srv Weight */
+    value = ini_config->mdns_resp_type_srv_weight;
+    wlan_hdd_mdns_format_response_u16(value, resp_info);
+    /* set Srv Port */
+    value = ini_config->mdns_resp_type_srv_port;
+    wlan_hdd_mdns_format_response_u16(value, resp_info);
+
+    if (!wlan_hdd_mdns_pack_response_type_srv_target(ini_config, resp_info,
+                        resptype_srv_tgt, resptype_srv,
+                        resptype_ptr, resptype_ptr_dn,
+                        resptype_txt, resptype_a)) {
+        return FALSE;
+    }
+    /* Set the RData length */
+    len = offset_data_len + sizeof(uint16_t);
+    if ((resptype_srv_tgt->num_entries > 0) &&
+        (resp_info->resp_len > len)) {
+        value = resp_info->resp_len - len;
+        val_u8 = (value & 0xff00) >> 8;
+        resp_info->resp_data[offset_data_len] = val_u8;
+        val_u8 = value & 0xff;
+        resp_info->resp_data[offset_data_len+1] = val_u8;
+    } else {
+        hddLog(LOGE, FL("Fail to process mDNS response (%d)!"),
+            MDNS_TYPE_SRV);
+        return FALSE;
+    }
+
+    EXIT();
+    return TRUE;
+}
+
+/**
+ * wlan_hdd_mdns_free_mem() - Free the allocated memory
+ * @response: Pointer to the struct hdd_mdns_resp_info
+ *
+ * Return: None
+ */
+static void wlan_hdd_mdns_free_mem(struct hdd_mdns_resp_info *response)
+{
+    if (response && response->data)
+        vos_mem_free(response->data);
+    if (response && response->offset)
+        vos_mem_free(response->offset);
+}
+
+/**
+ * wlan_hdd_mdns_pack_response() - Pack mDNS response
+ * @ini_config: Pointer to the struct hdd_config_t
+ * @resp_info: Pointer to the struct tSirMDNSResponseInfo
+ *
+ * This function will pack four types of responses (Type A, Type Txt, Type Ptr
+ * and Type Service). Each response contains QName, response type, class, TTL
+ * and data fields.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+static bool wlan_hdd_mdns_pack_response(hdd_config_t *ini_config,
+                    sir_mdns_resp_info resp_info)
+{
+    struct hdd_mdns_resp_info resptype_a, resptype_txt;
+    struct hdd_mdns_resp_info resptype_ptr, resptype_ptr_dn;
+    struct hdd_mdns_resp_info resptype_srv, resptype_srv_tgt;
+    uint32_t num_res_records = 0;
+    bool status = FALSE;
+
+    ENTER();
+
+    wlan_hdd_mdns_reset_response(&resptype_a);
+    wlan_hdd_mdns_reset_response(&resptype_txt);
+    wlan_hdd_mdns_reset_response(&resptype_ptr);
+    wlan_hdd_mdns_reset_response(&resptype_ptr_dn);
+    wlan_hdd_mdns_reset_response(&resptype_srv);
+    wlan_hdd_mdns_reset_response(&resptype_srv_tgt);
+
+    resp_info->resp_len = 0;
+
+    /* Process Type A response */
+    if (!wlan_hdd_mdns_pack_response_type_a(ini_config, resp_info,
+                        &resptype_a))
+        goto err_resptype_a;
+
+    if ((resptype_a.num_entries > 0) &&
+        (strlen((char *)&resptype_a.data[0]) > 0))
+        num_res_records++;
+
+    /* Process Type TXT response */
+    if (!wlan_hdd_mdns_pack_response_type_txt(ini_config, resp_info,
+                          &resptype_txt, &resptype_a))
+        goto err_resptype_txt;
+
+    if ((resptype_txt.num_entries > 0) &&
+        (strlen((char *)&resptype_txt.data[0]) > 0))
+        num_res_records++;
+
+    /* Process Type PTR response */
+    if (!wlan_hdd_mdns_pack_response_type_ptr(ini_config, resp_info,
+                      &resptype_ptr, &resptype_ptr_dn,
+                      &resptype_txt, &resptype_a))
+        goto err_resptype_ptr;
+
+    if ((resptype_ptr.num_entries > 0) &&
+        (strlen((char *)&resptype_ptr.data[0]) > 0))
+        num_res_records++;
+
+    /* Process Type SRV response */
+    if (!wlan_hdd_mdns_pack_response_type_srv(ini_config, resp_info,
+                      &resptype_srv, &resptype_srv_tgt,
+                      &resptype_ptr, &resptype_ptr_dn,
+                      &resptype_txt, &resptype_a))
+        goto err_resptype_srv;
+
+    if ((resptype_srv.num_entries > 0) &&
+        (strlen((char *)&resptype_srv.data[0]) > 0))
+        num_res_records++;
+
+    resp_info->resourceRecord_count = num_res_records;
+    hddLog(VOS_TRACE_LEVEL_INFO_HIGH,
+           "%s: Pack mDNS response data successfully!", __func__);
+    status = TRUE;
+
+err_resptype_srv:
+    wlan_hdd_mdns_free_mem(&resptype_srv);
+    wlan_hdd_mdns_free_mem(&resptype_srv_tgt);
+
+err_resptype_ptr:
+    wlan_hdd_mdns_free_mem(&resptype_ptr);
+    wlan_hdd_mdns_free_mem(&resptype_ptr_dn);
+
+err_resptype_txt:
+    wlan_hdd_mdns_free_mem(&resptype_txt);
+
+err_resptype_a:
+    wlan_hdd_mdns_free_mem(&resptype_a);
+
+    EXIT();
+    return status;
+}
+
+/**
+ * wlan_hdd_set_mdns_offload() - Enable mDNS offload
+ * @hostapd_adapter: Pointer to the struct hdd_adapter_t
+ *
+ * This function will set FQDN/unique FQDN (full qualified domain name)
+ * and the mDNS response. Then send them to SME.
+ *
+ * Return: Return boolean. TRUE for success, FALSE for fail.
+ */
+bool wlan_hdd_set_mdns_offload(hdd_adapter_t *hostapd_adapter)
+{
+    hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(hostapd_adapter);
+    sir_mdns_offload_info mdns_offload_info;
+    sir_mdns_fqdn_info mdns_fqdn_info;
+    sir_mdns_resp_info mdns_resp_info;
+    uint32_t fqdn_len, ufqdn_len;
+
+    ENTER();
+
+    /* 1. Prepare the MDNS fqdn request to send to SME */
+    fqdn_len = strlen(hdd_ctx->cfg_ini->mdns_fqdn);
+    ufqdn_len = strlen(hdd_ctx->cfg_ini->mdns_uniquefqdn);
+    if ((fqdn_len == 0) && (ufqdn_len == 0)) {
+        hddLog(LOGE, FL("No mDNS FQDN or UFQDN is assigned fqdn_len %d,"
+                        "ufqdn_len %d!"), fqdn_len, ufqdn_len);
+        return FALSE;
+    }
+
+    mdns_fqdn_info = vos_mem_malloc(sizeof(*mdns_fqdn_info));
+    if (NULL == mdns_fqdn_info) {
+        hddLog(LOGE, FL("could not allocate tSirMDNSFqdnInfo!"));
+        return FALSE;
+    }
+    /* MDNS fqdn request */
+    if (fqdn_len > 0) {
+           vos_mem_zero(mdns_fqdn_info, sizeof(*mdns_fqdn_info));
+           mdns_fqdn_info->bss_idx = hostapd_adapter->sessionId;
+           mdns_fqdn_info->fqdn_type = MDNS_FQDN_TYPE_GENERAL;
+           mdns_fqdn_info->fqdn_len = fqdn_len;
+           mdns_fqdn_info->mdns_fqdn_callback = hdd_mdns_fqdn_offload_done;
+           mdns_fqdn_info->mdns_fqdn_cb_context = hostapd_adapter;
+           vos_mem_copy(mdns_fqdn_info->fqdn_data,
+                hdd_ctx->cfg_ini->mdns_fqdn,
+                mdns_fqdn_info->fqdn_len);
+
+        if (eHAL_STATUS_SUCCESS !=
+            sme_set_mdns_fqdn(hdd_ctx->hHal, mdns_fqdn_info)) {
+            hddLog(LOGE, FL("sme_set_mdns_fqdn fail!"));
+            vos_mem_free(mdns_fqdn_info);
+            return FALSE;
+        }
+    }
+    /* MDNS unique fqdn request */
+    if (ufqdn_len > 0) {
+           vos_mem_zero(mdns_fqdn_info, sizeof(*mdns_fqdn_info));
+           mdns_fqdn_info->bss_idx = hostapd_adapter->sessionId;
+           mdns_fqdn_info->fqdn_type = MDNS_FQDN_TYPE_UNIQUE;
+           mdns_fqdn_info->fqdn_len = ufqdn_len;
+           mdns_fqdn_info->mdns_fqdn_callback = hdd_mdns_fqdn_offload_done;
+           mdns_fqdn_info->mdns_fqdn_cb_context = hostapd_adapter;
+           vos_mem_copy(mdns_fqdn_info->fqdn_data,
+                hdd_ctx->cfg_ini->mdns_uniquefqdn,
+                mdns_fqdn_info->fqdn_len);
+        if (eHAL_STATUS_SUCCESS !=
+            sme_set_mdns_fqdn(hdd_ctx->hHal, mdns_fqdn_info)) {
+            hddLog(LOGE, FL("sme_set_mdns_fqdn fail!"));
+            vos_mem_free(mdns_fqdn_info);
+            return FALSE;
+        }
+    }
+    vos_mem_free(mdns_fqdn_info);
+
+    /* 2. Prepare the MDNS response request to send to SME */
+    mdns_resp_info = vos_mem_malloc(sizeof(*mdns_resp_info));
+    if (NULL == mdns_resp_info) {
+        hddLog(LOGE, FL("could not allocate tSirMDNSResponseInfo!"));
+        return FALSE;
+    }
+
+    vos_mem_zero(mdns_resp_info, sizeof(*mdns_resp_info));
+    mdns_resp_info->bss_idx = hostapd_adapter->sessionId;
+    mdns_resp_info->mdns_resp_callback = hdd_mdns_resp_offload_done;
+    mdns_resp_info->mdns_resp_cb_context = hostapd_adapter;
+    if (!wlan_hdd_mdns_pack_response(hdd_ctx->cfg_ini, mdns_resp_info)) {
+        hddLog(LOGE, FL("wlan_hdd_pack_mdns_response fail!"));
+        vos_mem_free(mdns_resp_info);
+        return FALSE;
+    }
+    if (eHAL_STATUS_SUCCESS !=
+        sme_set_mdns_resp(hdd_ctx->hHal, mdns_resp_info)) {
+        hddLog(LOGE, FL("sme_set_mdns_resp fail!"));
+        vos_mem_free(mdns_resp_info);
+        return FALSE;
+    }
+    vos_mem_free(mdns_resp_info);
+
+    /* 3. Prepare the MDNS Enable request to send to SME */
+    mdns_offload_info = vos_mem_malloc(sizeof(*mdns_offload_info));
+    if (NULL == mdns_offload_info) {
+        hddLog(LOGE, FL("could not allocate tSirMDNSOffloadInfo!"));
+        return FALSE;
+    }
+
+    vos_mem_zero(mdns_offload_info, sizeof(*mdns_offload_info));
+
+    mdns_offload_info->bss_idx = hostapd_adapter->sessionId;
+    mdns_offload_info->enable = hdd_ctx->cfg_ini->enable_mdns_offload;
+    mdns_offload_info->mdns_enable_callback = hdd_mdns_enable_offload_done;
+    mdns_offload_info->mdns_enable_cb_context = hostapd_adapter;
+    if (eHAL_STATUS_SUCCESS !=
+        sme_set_mdns_offload(hdd_ctx->hHal, mdns_offload_info)) {
+        hddLog(LOGE, FL("sme_set_mdns_offload fail!"));
+        vos_mem_free(mdns_offload_info);
+        return FALSE;
+    }
+
+    vos_mem_free(mdns_offload_info);
+    hddLog(VOS_TRACE_LEVEL_INFO_HIGH,
+           "%s: enable mDNS offload successfully!", __func__);
+    return TRUE;
+}
+
+
+#endif /* MDNS_OFFLOAD */
+
+/**
+ * wlan_hdd_start_sap() - This function starts bss of SAP.
+ * @ap_adapter: SAP adapter
+ *
+ * This function will process the starting of sap adapter.
+ *
+ * Return: void.
+ */
+void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter)
+{
+	hdd_ap_ctx_t *hdd_ap_ctx;
+	hdd_hostapd_state_t *hostapd_state;
+	VOS_STATUS vos_status;
+	hdd_context_t *hdd_ctx;
+	tsap_Config_t *pConfig;
+
+	if (NULL == ap_adapter) {
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+		FL("ap_adapter is NULL here"));
+		return;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
+	pConfig = &ap_adapter->sessionCtx.ap.sapConfig;
+
+	mutex_lock(&hdd_ctx->sap_lock);
+	if (test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags))
+		goto end;
+
+	if (0 != wlan_hdd_cfg80211_update_apies(ap_adapter)) {
+		hddLog(LOGE, FL("SAP Not able to set AP IEs"));
+		goto end;
+	}
+
+	vos_event_reset(&hostapd_state->vosEvent);
+	if (WLANSAP_StartBss(hdd_ctx->pvosContext, hdd_hostapd_SAPEventCB,
+			&hdd_ap_ctx->sapConfig, (v_PVOID_t)ap_adapter->dev)
+			!= VOS_STATUS_SUCCESS) {
+		goto end;
+	}
+
+	VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+		FL("Waiting for SAP to start"));
+	vos_status = vos_wait_single_event(&hostapd_state->vosEvent, 10000);
+	if (!VOS_IS_STATUS_SUCCESS(vos_status)) {
+		VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+			FL("SAP Start failed"));
+		goto end;
+	}
+	VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO_HIGH,
+		FL("SAP Start Success"));
+	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
+
+	wlan_hdd_incr_active_session(hdd_ctx, ap_adapter->device_mode);
+	hostapd_state->bCommit = TRUE;
+
+end:
+	mutex_unlock(&hdd_ctx->sap_lock);
+	return;
+}
+
+#ifdef WLAN_FEATURE_TSF
+
+/**
+ * hdd_tsf_cb() - handle tsf request callback
+ *
+ * @pcb_cxt: pointer to the hdd_contex
+ * @ptsf: pointer to struct stsf
+ *
+ * Based on the request sent .
+ *
+ * Return: Describe the execute result of this routine
+ */
+static int hdd_tsf_cb(void *pcb_ctx, struct stsf *ptsf)
+{
+    hdd_context_t *hddctx;
+    int status;
+    hdd_adapter_t* adapter = (hdd_adapter_t*)pcb_ctx;
+
+    if (pcb_ctx == NULL || ptsf == NULL) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("HDD context is not valid"));
+        return -EINVAL;
+    }
+
+    hddctx = (hdd_context_t *)pcb_ctx;
+    status = wlan_hdd_validate_context(hddctx);
+    if (0 != status)
+        return -EINVAL;
+
+    if (NULL == adapter) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("failed to find adapter"));
+        return -EINVAL;
+    }
+
+    hddLog(VOS_TRACE_LEVEL_INFO,
+           FL("tsf cb handle event, device_mode is %d"),
+           adapter->device_mode);
+
+    /* copy the return value to hdd_tsf_ctx in adapter*/
+    if (ptsf->tsf_req_status) {
+
+        vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+        adapter->tsf_cap_ctx.tsf_get_state = TSF_NOT_RETURNED_BY_FW;
+        adapter->tsf_cap_ctx.tsf_capture_state  = TSF_IDLE;
+        vos_event_set (&adapter->tsf_cap_ctx.tsf_capture_done_event);
+        vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+
+        hddLog(VOS_TRACE_LEVEL_ERROR, FL("tsf req failure :%d"),
+               ptsf->tsf_req_status);
+        return ptsf->tsf_req_status;
+    }
+    /* If this is a get request.Store the tsf values in adapter. */
+    if (!ptsf->set_tsf_req) {
+        vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+        adapter->tsf_cap_ctx.tsf_low  = ptsf->tsf_low;
+        adapter->tsf_cap_ctx.tsf_high = ptsf->tsf_high;
+        adapter->tsf_cap_ctx.tsf_get_state = TSF_RETURN;
+        adapter->tsf_cap_ctx.tsf_capture_state = TSF_IDLE;
+        vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+
+        hddLog(VOS_TRACE_LEVEL_INFO,
+               FL("hdd_get_tsf_cb sta=%u, tsf_low=%u, tsf_high=%u"),
+                   adapter->sessionId, ptsf->tsf_low, ptsf->tsf_high);
+    }
+    else {
+        vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+        adapter->tsf_cap_ctx.tsf_capture_state = TSF_CAP_STATE;
+        adapter->tsf_cap_ctx.tsf_get_state = TSF_CURRENT_IN_CAP_STATE;
+        vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+    }
+    vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+    vos_event_set (&adapter->tsf_cap_ctx.tsf_capture_done_event);
+    vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+
+    /* free allocated mem */
+    vos_mem_free(ptsf);
+
+    return 0;
+}
+
+/**
+ * hdd_capture_tsf() - capture tsf
+ *
+ * @adapter: pointer to adapter
+ * @buf: pointer to upper layer buf
+ * @len : the length of buf
+ *
+ * This function returns tsf value to uplayer.
+ *
+ * Return: Describe the execute result of this routine
+ */
+int hdd_capture_tsf(hdd_adapter_t *adapter, uint32_t *buf, int len)
+{
+    int ret = 0;
+    hdd_station_ctx_t *hdd_sta_ctx;
+    hdd_context_t *hdd_ctx;
+    tSirCapTsfParams cap_tsf_params;
+    VOS_STATUS status;
+
+    if (adapter == NULL || buf == NULL) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("invalid pointer"));
+        return -EINVAL;
+    }
+    if (len != 1)
+        return -EINVAL;
+
+    hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+    if (wlan_hdd_validate_context(hdd_ctx)) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("invalid hdd ctx"));
+        return -EINVAL;
+    }
+    if (adapter->device_mode == WLAN_HDD_INFRA_STATION ||
+        adapter->device_mode == WLAN_HDD_P2P_CLIENT) {
+        hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+        if (hdd_sta_ctx->conn_info.connState !=
+            eConnectionState_Associated) {
+
+            hddLog(VOS_TRACE_LEVEL_INFO,
+                   FL("failed to cap tsf, not connect with ap"));
+            buf[0] = TSF_STA_NOT_CONNECTED_NO_TSF;
+            return ret;
+        }
+    }
+    if ((adapter->device_mode == WLAN_HDD_SOFTAP ||
+         adapter->device_mode == WLAN_HDD_P2P_GO) &&
+         !(test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))) {
+         hddLog(VOS_TRACE_LEVEL_INFO,
+                FL("Soft AP / P2p GO not beaconing"));
+         buf[0] = TSF_SAP_NOT_STARTED_NO_TSF;
+         return ret;
+    }
+    if (adapter->tsf_cap_ctx.tsf_capture_state == TSF_CAP_STATE) {
+        hddLog(VOS_TRACE_LEVEL_INFO,
+               FL("current in capture state, pls reset"));
+        buf[0] = TSF_CURRENT_IN_CAP_STATE;
+    } else {
+        hddLog(VOS_TRACE_LEVEL_INFO, FL("ioctl issue cap tsf cmd"));
+        buf[0] = TSF_RETURN;
+        cap_tsf_params.session_id = adapter->sessionId;
+        cap_tsf_params.tsf_rsp_cb_func = hdd_tsf_cb;
+        cap_tsf_params.tsf_rsp_cb_ctx = adapter;
+
+        vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+        adapter->tsf_cap_ctx.tsf_capture_state = TSF_CAP_STATE;
+        adapter->tsf_cap_ctx.tsf_get_state = TSF_CURRENT_IN_CAP_STATE;
+        vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+
+        ret = sme_capture_tsf_req(hdd_ctx->hHal, cap_tsf_params);
+
+        if (ret != VOS_STATUS_SUCCESS) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, FL("capture fail"));
+            buf[0] = TSF_CAPTURE_FAIL;
+            vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+            adapter->tsf_cap_ctx.tsf_capture_state = TSF_IDLE;
+            vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+            return -EINVAL;
+        }
+        /* wait till we get a response from fw */
+        status = vos_wait_single_event(&adapter->tsf_cap_ctx.
+                                       tsf_capture_done_event,
+                                       HDD_TSF_CAP_REQ_TIMEOUT);
+
+        if (!VOS_IS_STATUS_SUCCESS(status)) {
+             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                       ("capture tsf vos wait for single_event failed!! %d"),
+                       adapter->tsf_cap_ctx.tsf_get_state);
+
+              vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+              adapter->tsf_cap_ctx.tsf_capture_state = TSF_IDLE;
+              vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+
+             return -EINVAL;
+        }
+    }
+    buf[0] = TSF_RETURN;
+    hddLog(VOS_TRACE_LEVEL_INFO,
+           FL("ioctl return cap tsf cmd, ret = %d"), ret);
+    return ret;
+}
+
+/**
+ * hdd_indicate_tsf() - return tsf to uplayer
+ *
+ * @adapter: pointer to adapter
+ * @buf: pointer to uplayer buf
+ * @len : the length of buf
+ *
+ * This function returns tsf value to uplayer.
+ *
+ * Return: Describe the execute result of this routine
+ */
+int hdd_indicate_tsf(hdd_adapter_t *adapter, uint32_t *buf, int len)
+{
+    int ret = 0;
+    hdd_station_ctx_t *hdd_sta_ctx;
+    hdd_context_t *hdd_ctx;
+    tSirCapTsfParams cap_tsf_params;
+    VOS_STATUS status;
+
+    if (adapter == NULL || buf == NULL) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("invalid pointer"));
+        return -EINVAL;
+    }
+    if (len != 3)
+        return -EINVAL;
+
+    buf [1] = 0;
+    buf [2] = 0;
+    hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+    if (wlan_hdd_validate_context(hdd_ctx)) {
+        hddLog(VOS_TRACE_LEVEL_ERROR,
+               FL("invalid hdd ctx"));
+        return -EINVAL;
+    }
+    if (adapter->device_mode == WLAN_HDD_INFRA_STATION ||
+        adapter->device_mode == WLAN_HDD_P2P_CLIENT) {
+        hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+        if (hdd_sta_ctx->conn_info.connState !=
+            eConnectionState_Associated) {
+
+            hddLog(VOS_TRACE_LEVEL_INFO,
+                   FL("failed to cap tsf, not connect with ap"));
+            buf[0] = TSF_STA_NOT_CONNECTED_NO_TSF;
+            return ret;
+        }
+    }
+    if ((adapter->device_mode == WLAN_HDD_SOFTAP ||
+         adapter->device_mode == WLAN_HDD_P2P_GO) &&
+         !(test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags))) {
+         hddLog(VOS_TRACE_LEVEL_INFO,
+                FL("Soft AP / P2p GO not beaconing"));
+         buf[0] = TSF_SAP_NOT_STARTED_NO_TSF;
+         return ret;
+    }
+
+    if (adapter->tsf_cap_ctx.tsf_capture_state != TSF_CAP_STATE ||
+        adapter->tsf_cap_ctx.tsf_get_state != TSF_CURRENT_IN_CAP_STATE ) {
+        hddLog(VOS_TRACE_LEVEL_INFO,
+        FL("Not in capture state,Enter capture state first"));
+        buf[0] = TSF_GET_FAIL;
+    } else {
+        hddLog(VOS_TRACE_LEVEL_INFO, FL("ioctl issue cap tsf cmd"));
+        cap_tsf_params.session_id = adapter->sessionId;
+        cap_tsf_params.tsf_rsp_cb_func = hdd_tsf_cb;
+        cap_tsf_params.tsf_rsp_cb_ctx = adapter;
+
+        ret = sme_get_tsf_req(hdd_ctx->hHal, cap_tsf_params);
+
+        if (ret != VOS_STATUS_SUCCESS) {
+            hddLog(VOS_TRACE_LEVEL_ERROR, FL("capture fail"));
+            buf[0] = TSF_CAPTURE_FAIL;
+            vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+            adapter->tsf_cap_ctx.tsf_capture_state = TSF_IDLE;
+            vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+            return -EINVAL;
+        }
+        /* wait till we get a response from fw */
+        status = vos_wait_single_event(&adapter->tsf_cap_ctx.
+                                        tsf_capture_done_event,
+                                        HDD_TSF_GET_REQ_TIMEOUT);
+
+        if (!VOS_IS_STATUS_SUCCESS(status)) {
+             VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                       ("capture tsf vos wait for single_event failed!! %d"),
+                       status);
+
+             vos_spin_lock_acquire(&adapter->tsf_cap_ctx.tsf_lock);
+             adapter->tsf_cap_ctx.tsf_capture_state = TSF_IDLE;
+             vos_spin_lock_release(&adapter->tsf_cap_ctx.tsf_lock);
+             return status;
+        }
+        buf[1] = adapter->tsf_cap_ctx.tsf_low;
+        buf[2] = adapter->tsf_cap_ctx.tsf_high;
+
+        hddLog(VOS_TRACE_LEVEL_INFO,
+               FL("get tsf cmd,status=%u, tsf_low=%u, tsf_high=%u"),
+               buf[0], buf[1], buf[2]);
+    }
+    hddLog(VOS_TRACE_LEVEL_INFO,
+           FL("ioctl return cap tsf cmd, ret = %d"), ret);
+    return ret;
+}
+
+void wlan_hdd_tsf_init(hdd_adapter_t *adapter)
+{
+
+    if (adapter == NULL) {
+       hddLog(VOS_TRACE_LEVEL_ERROR,
+              FL("TSF init on a null adapter!"));
+       return;
+   }
+
+   adapter->tsf_cap_ctx.tsf_get_state = TSF_RETURN;
+   adapter->tsf_cap_ctx.tsf_capture_state = TSF_IDLE;
+   vos_event_init(&adapter->tsf_cap_ctx.tsf_capture_done_event);
+   vos_spin_lock_init(&adapter->tsf_cap_ctx.tsf_lock);
+   adapter->tsf_cap_ctx.tsf_high = 0;
+   adapter->tsf_cap_ctx.tsf_low = 0;
+}
+
+#endif
 
 //Register the module init/exit functions
 module_init(hdd_module_init);

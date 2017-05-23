@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -206,7 +206,7 @@ typedef enum
     eCsrLostLink1Abort,
     eCsrLostLink2Abort,
     eCsrLostLink3Abort,
-
+    ecsr_mbb_perform_preauth_reassoc,
 }eCsrRoamReason;
 
 typedef enum
@@ -627,12 +627,17 @@ typedef struct tagCsrConfig
     v_BOOL_t     isPERRoamEnabled;
     v_BOOL_t     isPERRoamCCAEnabled;
     v_S15_t      PERRoamFullScanThreshold;
+    v_S15_t      PERMinRssiThresholdForRoam;
     tANI_U32     rateUpThreshold;
     tANI_U32     rateDownThreshold;
     tANI_U32     waitPeriodForNextPERScan;
     tANI_U32     PERtimerThreshold;
     tANI_U32     PERroamTriggerPercent;
 #endif
+#endif
+
+#ifdef WLAN_FEATURE_LFR_MBB
+    tANI_BOOLEAN enable_lfr_mbb;
 #endif
 
 #ifdef FEATURE_WLAN_ESE
@@ -1493,3 +1498,18 @@ void csrDisableDfsChannel(tpAniSirGlobal pMac);
 eHalStatus csrEnableRMC(tpAniSirGlobal pMac, tANI_U32 sessionId);
 eHalStatus csrDisableRMC(tpAniSirGlobal pMac, tANI_U32 sessionId);
 #endif /* WLAN_FEATURE_RMC */
+
+eHalStatus csrRoamStopNetwork(tpAniSirGlobal pMac, tANI_U32 sessionId,
+    tCsrRoamProfile *pProfile, tSirBssDescription *pBssDesc,
+    tDot11fBeaconIEs *pIes);
+
+eHalStatus csrRoamSaveSecurityRspIE(tpAniSirGlobal pMac,
+    tANI_U32 sessionId, eCsrAuthType authType,
+    tSirBssDescription *pSirBssDesc,
+    tDot11fBeaconIEs *pIes);
+
+void csrRoamSubstateChange(tpAniSirGlobal pMac,
+    eCsrRoamSubState NewSubstate, tANI_U32 sessionId);
+
+eHalStatus csrRoamFreeConnectedInfo(tpAniSirGlobal pMac,
+   tCsrRoamConnectedInfo *pConnectedInfo);

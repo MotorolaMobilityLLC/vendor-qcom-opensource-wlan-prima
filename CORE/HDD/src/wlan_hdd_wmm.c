@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1960,6 +1960,37 @@ void hdd_log_ip_addr(struct sk_buff *skb)
 }
 
 /**============================================================================
+  @brief hdd_get_arp_src_ip() - Function to get ARP src IP addr
+  @param skb      : [in]  pointer to OS packet (sk_buff)
+  @return         : IP addr
+  ===========================================================================*/
+uint32_t  hdd_get_arp_src_ip(struct sk_buff *skb)
+{
+   struct arphdr *arp;
+   unsigned char *arp_ptr;
+   uint32_t src_ip;
+
+#define ARP_HDR_SIZE ( sizeof(__be16)*3 + sizeof(unsigned char)*2 )
+#define ARP_SENDER_HW_ADDRESS_SZ (6)
+#define ARP_SENDER_IP_ADDRESS_SZ (4)
+
+   arp = (struct arphdr *)skb->data;
+
+   arp_ptr = (unsigned char *)arp + ARP_HDR_SIZE;
+   arp_ptr += ARP_SENDER_HW_ADDRESS_SZ;
+
+   memcpy(&src_ip, arp_ptr, ARP_SENDER_IP_ADDRESS_SZ);
+
+   src_ip=ntohl(src_ip);
+
+   return src_ip;
+
+#undef ARP_HDR_SIZE
+#undef ARP_SENDER_HW_ADDRESS_SZ
+#undef ARP_SENDER_IP_ADDRESS_SZ
+}
+
+/**============================================================================
   @brief hdd_wmm_classify_pkt() - Function which will classify an OS packet
   into a WMM AC based on either 802.1Q or DSCP
 
@@ -2201,7 +2232,7 @@ v_U16_t hdd_hostapd_select_queue(struct net_device * dev, struct sk_buff *skb
    }
    /*Get the Station ID*/
    STAId = hdd_sta_id_find_from_mac_addr(pAdapter, pDestMacAddress);
-   if (STAId == HDD_WLAN_INVALID_STA_ID) {
+   if (STAId == HDD_WLAN_INVALID_STA_ID || STAId >= WLAN_MAX_STA_COUNT) {
        VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_INFO,
                  "%s: Failed to find right station", __func__);
        goto done;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -41,6 +41,11 @@
 #include <csrNeighborRoam.h>
 #include "vos_utils.h"
 
+#ifdef WLAN_FEATURE_LFR_MBB
+#include "csr_roam_mbb.h"
+#endif
+
+
 /*--------------------------------------------------------------------------
   Initialize the FT context. 
   ------------------------------------------------------------------------*/
@@ -60,6 +65,18 @@ void sme_FTOpen(tHalHandle hHal)
         return;
     }                 
     vos_reset_roam_timer_log();
+
+#ifdef WLAN_FEATURE_LFR_MBB
+    status = vos_timer_init(&pMac->ft.ftSmeContext.pre_auth_reassoc_mbb_timer,
+                            VOS_TIMER_TYPE_SW,
+                            csr_preauth_reassoc_mbb_timer_callback,
+                            (void *)pMac);
+
+    if (eHAL_STATUS_SUCCESS != status) {
+        smsLog(pMac, LOGE, FL("pre_auth_reassoc_mbb_timer allocation failed"));
+        return;
+    }
+#endif
 }
 
 /*--------------------------------------------------------------------------
@@ -71,6 +88,10 @@ void sme_FTClose(tHalHandle hHal)
     //Clear the FT Context.
     sme_FTReset(hHal);
     vos_timer_destroy(&pMac->ft.ftSmeContext.preAuthReassocIntvlTimer);
+
+#ifdef WLAN_FEATURE_LFR_MBB
+    vos_timer_destroy(&pMac->ft.ftSmeContext.pre_auth_reassoc_mbb_timer);
+#endif
 }
 
 void sme_SetFTPreAuthState(tHalHandle hHal, v_BOOL_t state)
@@ -216,12 +237,7 @@ eHalStatus sme_FTSendUpdateKeyInd(tHalHandle hHal, tCsrRoamSetKey * pFTKeyInfo)
     tAniEdType edType;
     tpAniSirGlobal pMac = PMAC_STRUCT( hHal );
 #if defined WLAN_FEATURE_VOWIFI_11R_DEBUG
-    int i = 0;
-
     smsLog(pMac, LOG1, FL("keyLength %d"), pFTKeyInfo->keyLength);
-
-    for (i=0; i<pFTKeyInfo->keyLength; i++)
-      smsLog(pMac, LOG1, FL("%02x"), pFTKeyInfo->Key[i]);
 #endif
 
     msgLen = sizeof(tSirFTUpdateKeyInfo);
@@ -262,23 +278,7 @@ eHalStatus sme_FTSendUpdateKeyInd(tHalHandle hHal, tCsrRoamSetKey * pFTKeyInfo)
     keymaterial->key[ 0 ].keyLength = pFTKeyInfo->keyLength;
 
     if ( pFTKeyInfo->keyLength && pFTKeyInfo->Key )
-    {
         vos_mem_copy(&keymaterial->key[ 0 ].key, pFTKeyInfo->Key, pFTKeyInfo->keyLength);
-        if(pFTKeyInfo->keyLength == 16)
-        {
-          smsLog(pMac, LOG1, "SME Set Update Ind keyIdx (%d) encType(%d) key = "
-          "%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X",
-          pMsg->keyMaterial.key[0].keyId, (tAniEdType)pMsg->keyMaterial.edType,
-          pMsg->keyMaterial.key[0].key[0], pMsg->keyMaterial.key[0].key[1],
-          pMsg->keyMaterial.key[0].key[2], pMsg->keyMaterial.key[0].key[3],
-          pMsg->keyMaterial.key[0].key[4], pMsg->keyMaterial.key[0].key[5],
-          pMsg->keyMaterial.key[0].key[6], pMsg->keyMaterial.key[0].key[7],
-          pMsg->keyMaterial.key[0].key[8], pMsg->keyMaterial.key[0].key[9],
-          pMsg->keyMaterial.key[0].key[10], pMsg->keyMaterial.key[0].key[11],
-          pMsg->keyMaterial.key[0].key[12], pMsg->keyMaterial.key[0].key[13],
-          pMsg->keyMaterial.key[0].key[14], pMsg->keyMaterial.key[0].key[15]);
-        }
-    }
 
     vos_mem_copy( &pMsg->bssId[ 0 ],
                   &pFTKeyInfo->peerMac[ 0 ],

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2219,10 +2219,11 @@ static tANI_S32 csrFindCongestionScore (tpAniSirGlobal pMac, tCsrScanResult *pBs
         return -1;
     }
 
-    if (bssInfo->rssi < PER_BAD_RSSI) {
+    if (bssInfo->rssi < pMac->roam.configParam.PERMinRssiThresholdForRoam) {
         smsLog(pMac, LOG1,
-               FL("discrarding candidate due to low rssi=%d bssid "
+               FL("discarding candidate due to low rssi=%d than %d, bssid "
                MAC_ADDRESS_STR), bssInfo->rssi,
+               pMac->roam.configParam.PERMinRssiThresholdForRoam,
                MAC_ADDR_ARRAY(pBss->Result.BssDescriptor.bssId));
         return 0;
     }
@@ -2290,6 +2291,18 @@ static tANI_S32 csrFindSelfCongestionScore(tpAniSirGlobal pMac,
 
     if (pSession == NULL)
         return -1;
+
+    if (bssInfo->rssi < pMac->roam.configParam.PERMinRssiThresholdForRoam) {
+        smsLog(pMac, LOG1,
+               FL("Current AP has low rssi=%d than %d"), bssInfo->rssi,
+               pMac->roam.configParam.PERMinRssiThresholdForRoam);
+        /*
+         * Make Current candidate score as zero which will cause roaming
+         * in low RSSI scenarios
+         */
+        pMac->currentBssScore = 0;
+        return 0;
+    }
 
     for (i = 0; i <= pMac->PERroamCandidatesCnt; i++)
         if (pMac->candidateChannelInfo[i].channelNumber == bssInfo->channelId)
@@ -2700,6 +2713,14 @@ eHalStatus csrScanGetResult(tpAniSirGlobal pMac, tCsrScanResultFilter *pFilter, 
                                         LL_ACCESS_NOLOCK);
                     }
                 }
+                /* bssid hint AP should be on head */
+                else if (pFilter &&
+                     vos_mem_compare(pResult->Result.BssDescriptor.bssId,
+                     pFilter->bssid_hint, VOS_MAC_ADDR_SIZE))
+                {
+                     csrLLInsertHead(&pRetList->List,
+                            &pResult->Link, LL_ACCESS_NOLOCK);
+                }
                 else
                 {
                     //To sort the list
@@ -2710,6 +2731,14 @@ eHalStatus csrScanGetResult(tpAniSirGlobal pMac, tCsrScanResultFilter *pFilter, 
                     while(pTmpEntry)
                     {
                         pTmpResult = GET_BASE_ADDR( pTmpEntry, tCsrScanResult, Link );
+                        /* Skip the bssid hint AP, as it should be on head */
+                        if (pFilter && vos_mem_compare(
+                           pTmpResult->Result.BssDescriptor.bssId,
+                           pFilter->bssid_hint, VOS_MAC_ADDR_SIZE)) {
+                           pTmpEntry = csrLLNext(&pRetList->List,
+                                                  pTmpEntry, LL_ACCESS_NOLOCK);
+                           continue;
+                        }
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
                         if (pFilter && pFilter->isPERRoamScan) {
                             csrFindCongestionScore(pMac, pResult);
@@ -4068,8 +4097,6 @@ void csrApplyChannelPowerCountryInfo( tpAniSirGlobal pMac, tCsrChannel *pChannel
         // extend scan capability
         //  build a scan list based on the channel list : channel# + active/passive scan
         csrSetCfgScanControlList(pMac, countryCode, &ChannelList);
-        /*Send msg to Lim to clear DFS channel list */
-        csrClearDfsChannelList(pMac);
 #ifdef FEATURE_WLAN_SCAN_PNO
         if (updateRiva)
         {
@@ -6881,7 +6908,7 @@ eHalStatus csrScanCopyRequest(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq, tCs
                         }
                         else
                             csrValidateScanChannels(pMac, pDstReq, pSrcReq,
-                                                    new_index, ch144_support);
+                                                    &new_index, ch144_support);
                         pDstReq->ChannelInfo.numOfChannels = new_index;
 #ifdef FEATURE_WLAN_LFR
                         if ( ( ( eCSR_SCAN_HO_BG_SCAN ==
@@ -7930,9 +7957,11 @@ static eHalStatus csr_ssid_scan_done_callback(tHalHandle halHandle,
     struct csr_scan_for_ssid_context *scan_context =
                     (struct csr_scan_for_ssid_context *)context;
 
-    if (NULL == scan_context)
+    if (NULL == scan_context) {
         VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_ERROR,
                   FL("scan for ssid context not found"));
+        return eHAL_STATUS_FAILURE;
+    }
 
     if (eCSR_SCAN_ABORT == status)
         csrRoamCallCallback(scan_context->pMac, scan_context->sessionId,
@@ -8505,7 +8534,6 @@ void csrSetCfgScanControlList( tpAniSirGlobal pMac, tANI_U8 *countryCode, tCsrCh
                     }
                 }
             }
-
             smsLog(pMac, LOG1, FL("fEnableDFSChnlScan %d"),
                                        pMac->scan.fEnableDFSChnlScan);
             VOS_TRACE(VOS_MODULE_ID_SME, VOS_TRACE_LEVEL_INFO,
@@ -8517,6 +8545,10 @@ void csrSetCfgScanControlList( tpAniSirGlobal pMac, tANI_U8 *countryCode, tCsrCh
         }//Successfully getting scan control list
         vos_mem_free(pControlList);
     }//AllocateMemory
+
+    /* Send msg to Lim to clear DFS channel list */
+    smsLog(pMac, LOG1, FL("csrClearDfsChannelList"));
+    csrClearDfsChannelList(pMac);
 }
 
 //if bgPeriod is 0, background scan is disabled. It is in millisecond units
@@ -9154,6 +9186,25 @@ eHalStatus csrScanSavePreferredNetworkFound(tpAniSirGlobal pMac,
    vos_mem_copy((tANI_U8 *) &pBssDescr->bssId, (tANI_U8 *) macHeader->bssId, sizeof(tSirMacAddr));
    pBssDescr->nReceivedTime = vos_timer_get_system_time();
 
+#ifdef WLAN_FEATURE_VOWIFI_11R
+    // MobilityDomain
+    pBssDescr->mdie[0] = 0;
+    pBssDescr->mdie[1] = 0;
+    pBssDescr->mdie[2] = 0;
+    pBssDescr->mdiePresent = FALSE;
+    // If mdie is present in the probe resp we fill it in the bss description
+    if(pParsedFrame->mdiePresent)
+    {
+        pBssDescr->mdiePresent = TRUE;
+        pBssDescr->mdie[0] = pParsedFrame->mdie[0];
+        pBssDescr->mdie[1] = pParsedFrame->mdie[1];
+        pBssDescr->mdie[2] = pParsedFrame->mdie[2];
+    }
+    smsLog(pMac, LOG1, FL("mdie=%02x%02x%02x"),
+           (unsigned int)pBssDescr->mdie[0], (unsigned int)pBssDescr->mdie[1],
+           (unsigned int)pBssDescr->mdie[2]);
+#endif
+
    smsLog( pMac, LOG1, FL("Bssid= "MAC_ADDRESS_STR
                        " chan= %d, rssi = %d "),
                        MAC_ADDR_ARRAY(pBssDescr->bssId),
@@ -9371,7 +9422,7 @@ void UpdateCCKMTSF(tANI_U32 *timeStamp0, tANI_U32 *timeStamp1, tANI_U32 *incr)
 #endif
 
 void csrValidateScanChannels(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq,
-        tCsrScanRequest *pSrcReq, int new_index, tANI_U8 ch144_support)
+        tCsrScanRequest *pSrcReq, tANI_U32 *new_index, tANI_U8 ch144_support)
 {
 
     int index;
@@ -9422,9 +9473,9 @@ void csrValidateScanChannels(tpAniSirGlobal pMac, tCsrScanRequest *pDstReq,
                             continue;
                         }
 
-            pDstReq->ChannelInfo.ChannelList[new_index] =
+            pDstReq->ChannelInfo.ChannelList[*new_index] =
                 pSrcReq->ChannelInfo.ChannelList[index];
-            new_index++;
+            (*new_index)++;
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -207,6 +207,17 @@ enum log_event_host_reason_code {
 	WLAN_LOG_REASON_SME_OUT_OF_CMD_BUF,
 	WLAN_LOG_REASON_SCAN_NOT_ALLOWED,
 };
+
+/**
+ * vos_wdi_trace_event_type: Trace type for WDI Write/Read
+ * VOS_WDI_READ: Log the WDI read event
+ * VOS_WDI_WRITE: Log the WDI write event
+ */
+typedef enum
+{
+   VOS_WDI_READ,
+   VOS_WDI_WRITE,
+} vos_wdi_trace_event_type;
 
 /*------------------------------------------------------------------------- 
   Function declarations and documenation
@@ -506,11 +517,21 @@ v_BOOL_t vos_isLoadUnloadInProgress(void);
 bool vos_get_rx_wow_dump(void);
 void vos_set_rx_wow_dump(bool value);
 
+void vos_set_hdd_bad_sta(uint8_t sta_id);
+void vos_reset_hdd_bad_sta(uint8_t sta_id);
+
 void vos_probe_threads(void);
 void vos_per_pkt_stats_to_user(void *perPktStat);
 void vos_updatePktStatsInfo(void * pktStat);
 bool vos_is_wlan_logging_enabled(void);
 
 v_BOOL_t vos_is_probe_rsp_offload_enabled(void);
+void vos_set_snoc_high_freq_voting(bool enable);
+void vos_smd_dump_stats(void);
+void vos_log_wdi_event(uint16 msg, vos_wdi_trace_event_type event);
+void vos_dump_wdi_events(void);
 
+bool vos_check_arp_target_ip(vos_pkt_t *pPacket);
+void vos_update_arp_fw_tx_delivered(void);
+void vos_update_arp_rx_drop_reorder(void);
 #endif // if !defined __VOS_NVITEM_H
