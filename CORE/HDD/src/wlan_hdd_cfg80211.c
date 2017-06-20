@@ -11927,9 +11927,15 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
             StaParams.supported_oper_classes_len  =
                                              params->supported_oper_classes_len;
 
+            if (params->ext_capab_len > sizeof(StaParams.extn_capability)) {
+                VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
+                          "received extn capabilities:%d, resetting it to max supported",
+                          params->ext_capab_len);
+                params->ext_capab_len = sizeof(StaParams.extn_capability);
+            }
             if (0 != params->ext_capab_len)
                 vos_mem_copy(StaParams.extn_capability, params->ext_capab,
-                             sizeof(StaParams.extn_capability));
+                             params->ext_capab_len);
 
             if (NULL != params->ht_capa)
             {
@@ -18495,6 +18501,7 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 #endif
     tANI_U16 numCurrTdlsPeers;
     hdd_station_ctx_t *pHddStaCtx = NULL;
+    tdlsCtx_t *pHddTdlsCtx;
 
     pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
     if (NULL == pAdapter)
@@ -18531,6 +18538,12 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
                   "%s: Unloading/Loading in Progress. Ignore!!!", __func__);
         return -EAGAIN;
+    }
+
+    pHddTdlsCtx = WLAN_HDD_GET_TDLS_CTX_PTR(pAdapter);
+    if (!pHddTdlsCtx) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                  "%s: pHddTdlsCtx not valid.", __func__);
     }
 
     if (eTDLS_SUPPORT_NOT_ENABLED == pHddCtx->tdls_mode)
@@ -18700,13 +18713,15 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
         (SIR_MAC_TDLS_DIS_RSP == action_code) ||
         (SIR_MAC_TDLS_DIS_REQ == action_code))
     {
-        if (TRUE == sme_IsPmcBmps(WLAN_HDD_GET_HAL_CTX(pAdapter)))
-        {
+        if (TRUE == sme_IsPmcBmps(WLAN_HDD_GET_HAL_CTX(pAdapter))) {
             VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_INFO,
-                       "%s: Sending frame action_code %u.Disable BMPS", __func__, action_code);
+                    "%s: Sending frame action_code %u.Disable BMPS", __func__,
+                    action_code);
             status = hdd_disable_bmps_imps(pHddCtx, WLAN_HDD_INFRA_STATION);
             if (status != VOS_STATUS_SUCCESS) {
                 hddLog(VOS_TRACE_LEVEL_ERROR, FL("Failed to set BMPS/IMPS"));
+            } else {
+                pHddTdlsCtx->is_tdls_disabled_bmps = true;
             }
         }
         if (SIR_MAC_TDLS_DIS_REQ != action_code) {
