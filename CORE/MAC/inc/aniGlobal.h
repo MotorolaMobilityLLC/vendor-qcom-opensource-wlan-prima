@@ -44,12 +44,6 @@
 #ifndef _ANIGLOBAL_H
 #define _ANIGLOBAL_H
 
-// Take care to avoid redefinition of this type, if it is
-// already defined in "halWmmApi.h"
-#if !defined(_HALMAC_WMM_API_H)
-typedef struct sAniSirGlobal *tpAniSirGlobal;
-#endif
-
 #include "halTypes.h"
 #include "sirCommon.h"
 #include "aniSystemDefs.h"
@@ -946,6 +940,14 @@ typedef struct sFTContext
 } tftContext, *tpFTContext;
 #endif
 
+typedef struct assoc_rsp_tx_context
+{
+  vos_list_node_t node;
+  tANI_U8 psessionID;
+  tANI_U16 staId;
+  tANI_U32 txBdToken;
+} assoc_rsp_tx_context;
+
 //Check if this definition can actually move here even for Volans. In that case
 //this featurization can be removed.
 /** ------------------------------------------------------------------------- * 
@@ -1050,7 +1052,7 @@ typedef struct sAniSirGlobal
 #if defined WLAN_FEATURE_VOWIFI_11R
     tftContext   ft;
 #endif
-
+    vos_list_t assoc_rsp_completion_list;
     tANI_U32     gCurrentLogSize;
     tANI_U32     menuCurrent;
     /* logDump specific */

@@ -5645,10 +5645,12 @@ static tANI_BOOLEAN csrRoamProcessResults( tpAniSirGlobal pMac, tSmeCmd *pComman
         case eCsrReassocSuccess:
             if(eCsrReassocSuccess == Result)
             {
+                roamInfo.reassoc = true;
                 ind_qos = SME_QOS_CSR_REASSOC_COMPLETE;
             }
             else
             {
+                roamInfo.reassoc = false;
                 ind_qos = SME_QOS_CSR_ASSOC_COMPLETE;
             }
             // Success Join Response from LIM.  Tell NDIS we are connected and save the
@@ -5854,6 +5856,12 @@ static tANI_BOOLEAN csrRoamProcessResults( tpAniSirGlobal pMac, tSmeCmd *pComman
                     roamInfo.ucastSig = ( tANI_U8 )pJoinRsp->ucastSig;
                     roamInfo.bcastSig = ( tANI_U8 )pJoinRsp->bcastSig;
                     roamInfo.maxRateFlags = pJoinRsp->maxRateFlags;
+                    roamInfo.vht_caps = pJoinRsp->vht_caps;
+                    roamInfo.ht_caps = pJoinRsp->ht_caps;
+                    roamInfo.hs20vendor_ie = pJoinRsp->hs20vendor_ie;
+                    roamInfo.ht_operation = pJoinRsp->ht_operation;
+                    roamInfo.vht_operation = pJoinRsp->vht_operation;
+
                 }
                 else
                 {
@@ -7622,6 +7630,7 @@ eHalStatus csrRoamDisconnectInternal(tpAniSirGlobal pMac, tANI_U32 sessionId, eC
     else
     {
         csrScanAbortScanForSSID(pMac, sessionId);
+        csrScanStartIdleScan(pMac);
         status = eHAL_STATUS_CMD_NOT_QUEUED;
         smsLog(pMac, LOGE,
              FL("Disconnect not queued, Abort Scan for SSID"));
