@@ -1266,17 +1266,26 @@ int __wlan_hdd_mgmt_tx( struct wiphy *wiphy, struct net_device *dev,
     hdd_cfg80211_state_t *cfgState = WLAN_HDD_GET_CFG_STATE_PTR( pAdapter );
     hdd_remain_on_chan_ctx_t *pRemainChanCtx = NULL;
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX( pAdapter );
-    tANI_U8 type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
-    tANI_U8 subType = WLAN_HDD_GET_SUBTYPE_FRM_FC(buf[0]);
+    tANI_U8 type;
+    tANI_U8 subType;
     tActionFrmType actionFrmType = WLAN_HDD_ACTION_FRM_TYPE_MAX;
     bool noack = 0;
     int status;
+    uint32_t mgmt_hdr_len = sizeof(struct ieee80211_hdr_3addr);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
     uint8_t home_ch = 0;
 #endif
 
     ENTER();
+    if (len < mgmt_hdr_len + 1) {
+	hddLog(VOS_TRACE_LEVEL_ERROR,"Invalid Length");
+	return -EINVAL;
+    }
+
+    type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
+    subType = WLAN_HDD_GET_SUBTYPE_FRM_FC(buf[0]);
+
     MTRACE(vos_trace(VOS_MODULE_ID_HDD,
                       TRACE_CODE_HDD_ACTION, pAdapter->sessionId,
                       pAdapter->device_mode ));
