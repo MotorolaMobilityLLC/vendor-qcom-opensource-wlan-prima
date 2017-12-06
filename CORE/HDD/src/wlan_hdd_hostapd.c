@@ -2963,7 +2963,7 @@ int __iw_softap_modify_acl(struct net_device *dev,
     hdd_adapter_t *pHostapdAdapter;
     v_CONTEXT_t pVosContext;
     hdd_context_t *pHddCtx;
-    char *value = (char *)(wrqu->data.pointer);
+    uint8_t *value; // MOT IKSWO-29193
     v_U8_t pPeerStaMac[VOS_MAC_ADDR_SIZE];
     int listType, cmd, i;
     int ret = 0; /* success */
@@ -2989,6 +2989,17 @@ int __iw_softap_modify_acl(struct net_device *dev,
                  "%s: Vos Context is NULL",__func__);
         return -EINVAL;
     }
+    //BEGIN MOT IKSWO-29193
+    value = (uint8_t *) kmalloc(wrqu->data.length+1, GFP_KERNEL);
+    if(copy_from_user((uint8_t *) value, (uint8_t *)(wrqu->data.pointer), wrqu->data.length)) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s -- copy_from_user --data pointer failed! bailing",
+                 __func__);
+        kfree(value);
+        return -EFAULT;
+    }
+    //END MOT IKSWO-29193
+
     for (i=0; i<VOS_MAC_ADDR_SIZE; i++)
     {
         pPeerStaMac[i] = *(value+i);
@@ -2996,6 +3007,7 @@ int __iw_softap_modify_acl(struct net_device *dev,
     listType = (int)(*(value+i));
     i++;
     cmd = (int)(*(value+i));
+    kfree(value);//MOT IKSWO-29193
 
     hddLog(LOG1, "%s: SAP Modify ACL arg0 " MAC_ADDRESS_STR " arg1 %d arg2 %d",
             __func__, MAC_ADDR_ARRAY(pPeerStaMac), listType, cmd);
@@ -3503,7 +3515,7 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 {
     hdd_adapter_t *pHostapdAdapter;
     hdd_context_t *pHddCtx;
-    v_U8_t *peerMacAddr;
+    uint8_t *peerMacAddr; //MOT IKSWO-29193
     int ret = 0;
 
     ENTER();
@@ -3530,11 +3542,21 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
     /* iwpriv tool or framework calls this ioctl with
      * data passed in extra (less than 16 octets);
      */
-    peerMacAddr = (v_U8_t *)(wrqu->data.pointer);
+    //START MOT IKSWO-29193
+    peerMacAddr = (uint8_t *)kmalloc(wrqu->data.length+1, GFP_KERNEL);
+    if(copy_from_user((uint8_t *) peerMacAddr, (uint8_t *)(wrqu->data.pointer), wrqu->data.length)) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s -- copy_from_user --data pointer failed! bailing",
+                 __func__);
+        kfree(peerMacAddr);
+        return -EFAULT;
+    }
+    //END MOT IKSWO-29193
 
     hddLog(LOG1, "%s data "  MAC_ADDRESS_STR,
            __func__, MAC_ADDR_ARRAY(peerMacAddr));
     hdd_softap_sta_disassoc(pHostapdAdapter, peerMacAddr);
+    kfree(peerMacAddr); //MOT IKSWO-29193
     EXIT();
     return 0;
 }
