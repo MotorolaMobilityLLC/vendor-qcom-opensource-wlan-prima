@@ -9225,44 +9225,6 @@ static int iw_set_keepalive_params(struct net_device *dev,
 }
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
-/**-----------------------------------------------------------------
-
-  \brief hdd_pkt_filter_done - callback to be executed on completion
-                               successful/failure) for clear filter request.
-
-  \return -  None
-
-  --------------------------------------------------------------------------*/
-static void hdd_pkt_filter_done(void *data, v_U32_t status)
-{
-   struct statsContext *cbCtx = (struct statsContext *)data;
-
-   hddLog(VOS_TRACE_LEVEL_INFO,
-              FL("Pkt Filter Clear Status : %d"), status);
-
-   if (data == NULL)
-   {
-       hddLog(VOS_TRACE_LEVEL_ERROR, FL("invalid context"));
-       return;
-   }
-
-   spin_lock(&hdd_context_lock);
-   if (cbCtx->magic != CLEAR_FILTER_MAGIC)
-   {
-       spin_unlock(&hdd_context_lock);
-       hddLog(VOS_TRACE_LEVEL_ERROR, FL("invalid context, magic %x"), cbCtx->magic);
-       if (ioctl_debug)
-       {
-           pr_info("%s: Invalid context, magic [%08x]\n",
-                   __func__, cbCtx->magic);
-       }
-       return;
-   }
-
-   complete(&cbCtx->completion);
-   spin_unlock(&hdd_context_lock);
-}
-
 int wlan_hdd_set_filter(hdd_adapter_t *pAdapter, tpPacketFilterCfg pRequest)
 {
     hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
@@ -9272,7 +9234,6 @@ int wlan_hdd_set_filter(hdd_adapter_t *pAdapter, tpPacketFilterCfg pRequest)
     //IKHSS7-35965, a19091, Motorola changes -- BEGIN
     int retVal=0;
     //IKHSS7-35965, a19091, Motorola changes -- END
-    struct statsContext        cbCtx;
     int i=0, status;
 
     status = wlan_hdd_validate_context(pHddCtx);
@@ -9370,29 +9331,13 @@ int wlan_hdd_set_filter(hdd_adapter_t *pAdapter, tpPacketFilterCfg pRequest)
                                  pHddStaCtx->conn_info.staId[0]);
             }
 
-            init_completion(&cbCtx.completion);
-            cbCtx.magic = CLEAR_FILTER_MAGIC;
-            cbCtx.pAdapter = pAdapter;
-            packetFilterClrReq.cbCtx = &cbCtx;
             packetFilterClrReq.filterId = pRequest->filterId;
-            packetFilterClrReq.pktFilterCallback = hdd_pkt_filter_done;
+
             if (eHAL_STATUS_SUCCESS != sme_ReceiveFilterClearFilter(pHddCtx->hHal, &packetFilterClrReq, pAdapter->sessionId))
             {
                 hddLog(VOS_TRACE_LEVEL_ERROR, "%s: Failure to execute Clear Filter",
                         __func__);
                 retVal = -EINVAL; //IKHSS7-35965, a19091, Motorola
-            }
-
-            status = wait_for_completion_interruptible_timeout(&cbCtx.completion,
-                                                   msecs_to_jiffies(PKT_FILTER_TIMEOUT));
-            spin_lock(&hdd_context_lock);
-            cbCtx.magic = 0;
-            spin_unlock(&hdd_context_lock);
-            if (0 >= status)
-            {
-               hddLog(LOGE, FL("failure waiting for pkt_filter_comp_var %d"),
-                                status);
-               return -EINVAL;
             }
 
             WLANTL_SetDataPktFilter((WLAN_HDD_GET_CTX(pAdapter))->pvosContext,
