@@ -240,8 +240,6 @@ typedef v_U8_t tWlanHddMacAddr[HDD_MAC_ADDR_LEN];
 
 #define WLAN_WAIT_TIME_EXTSCAN  1000
 
-#define HDD_MAX_STA_COUNT (HAL_NUM_STA)
-
 /*
  * Generic asynchronous request/response support
  *
