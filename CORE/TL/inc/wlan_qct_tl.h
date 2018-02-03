@@ -3352,14 +3352,4 @@ WLANTL_SetMcastDuplicateDetection
 );
 #endif /* WLAN_FEATURE_RMC */
 
-/**
- * WLANTL_SetKeySeqCounter() - set sequence key counter
- * @pvosGCtx: global vos context
- * @counter: key sequence counter
- * @staid: station index
- *
- * Return: void
- */
-void WLANTL_SetKeySeqCounter(void *pvosGCtx, u64 counter, uint8_t staid);
-
 #endif /* #ifndef WLAN_QCT_WLANTL_H */
