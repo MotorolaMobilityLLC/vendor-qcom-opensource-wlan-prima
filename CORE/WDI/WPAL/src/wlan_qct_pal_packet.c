@@ -526,7 +526,7 @@ WPT_STATIC WPT_INLINE void* itGetOSPktAddrFromDevice( wpt_packet *pPacket )
 #else
        WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_FATAL,
                 "%s: skb->data == skb->tail. Attempting recovery "
-                "skb:%pK, head:%pK, tail:%pK, data:%pK",
+                "skb:%pK, head:%pK, tail:%dK, data:%pK",
                   __func__, skb, skb->head, skb->tail, skb->data);
 
       skb->data = skb->head;
