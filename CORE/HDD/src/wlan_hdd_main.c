@@ -225,11 +225,14 @@ struct android_wifi_reassoc_params {
 	int channel;
 };
 
+int wcnss_get_wlan_nv_name(char *nv_name);
+void wake_lock_timeout(vos_wake_lock_t *lock, long timeout);
+
 static vos_wake_lock_t wlan_wake_lock;
 
 /* set when SSR is needed after unload */
 static e_hdd_ssr_required isSsrRequired = HDD_SSR_NOT_REQUIRED;
-static struct wake_lock wlan_wake_lock_scan; //Mot IKHSS7-28961: Incorrect empty scan results
+static vos_wake_lock_t wlan_wake_lock_scan; //Mot IKHSS7-28961: Incorrect empty scan results
 
 //internal function declaration
 static VOS_STATUS wlan_hdd_framework_restart(hdd_context_t *pHddCtx);
