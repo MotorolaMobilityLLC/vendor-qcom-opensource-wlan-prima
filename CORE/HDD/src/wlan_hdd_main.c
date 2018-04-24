@@ -225,9 +225,6 @@ struct android_wifi_reassoc_params {
 	int channel;
 };
 
-int wcnss_get_wlan_nv_name(char *nv_name);
-void wake_lock_timeout(vos_wake_lock_t *lock, long timeout);
-
 static vos_wake_lock_t wlan_wake_lock;
 
 /* set when SSR is needed after unload */
@@ -12759,7 +12756,8 @@ end:
 //Begin Mot IKHSS7-28961 : Incorrect emtpty scan results because of againg out
 void hdd_prevent_suspend_after_scan(long hz)
 {
-  wake_lock_timeout(&wlan_wake_lock_scan, hz);
+//Todo:Just for wlan open MS0,need use Qcom define instead
+  __pm_wakeup_event(&wlan_wake_lock_scan, hz);
 }
 //END IKHSS7-28961
 
