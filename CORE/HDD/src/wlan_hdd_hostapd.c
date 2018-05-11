@@ -2812,7 +2812,7 @@ static int __iw_softap_set_trafficmonitor(struct net_device *dev,
                                           union iwreq_data *wrqu, char *extra)
 {
     hdd_adapter_t *pAdapter;
-    int *isSetTrafficMon = (int *)extra;
+    uint8_t *isSetTrafficMon; //IKSWO-89381
     hdd_context_t *pHddCtx;
     int status;
 
@@ -2836,12 +2836,16 @@ static int __iw_softap_set_trafficmonitor(struct net_device *dev,
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s : ", __func__);
 
-    if (NULL == isSetTrafficMon)
-    {
-        VOS_TRACE(VOS_MODULE_ID_SAP, VOS_TRACE_LEVEL_ERROR,
-                   "%s: Invalid SAP pointer from extra", __func__);
-        return -ENOMEM;
+    //BEGIN MOT IKSWO-89381
+    isSetTrafficMon = (uint8_t *) kmalloc(wrqu->data.length+1, GFP_KERNEL);
+    if(copy_from_user((uint8_t *) isSetTrafficMon, (uint8_t *)(wrqu->data.pointer), wrqu->data.length)) {
+        VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR,
+                 "%s -- copy_from_user --data pointer failed! bailing",
+                 __func__);
+        kfree(isSetTrafficMon);
+        return -EFAULT;
     }
+    //END MOT IKSWO-89381
 
     if (TRUE == *isSetTrafficMon)
     {
@@ -2850,6 +2854,7 @@ static int __iw_softap_set_trafficmonitor(struct net_device *dev,
         {
             VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ERROR,
                        "%s: failed to Start Traffic Monitor timer ", __func__ );
+            kfree(isSetTrafficMon); //IKSWO-89381
             return -EIO;
         }
     }
@@ -2860,11 +2865,13 @@ static int __iw_softap_set_trafficmonitor(struct net_device *dev,
         {
             VOS_TRACE( VOS_MODULE_ID_HDD_SOFTAP, VOS_TRACE_LEVEL_ERROR,
                        "%s: failed to Stop Traffic Monitor timer ", __func__ );
+            kfree(isSetTrafficMon); //IKSWO-89381
             return -EIO;
         }
 
     }
 
+    kfree(isSetTrafficMon); //IKSWO-89381
     EXIT();
     return 0;
 }
