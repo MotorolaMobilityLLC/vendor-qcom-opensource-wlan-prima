@@ -9734,7 +9734,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
     pRequest = (tpPacketFilterCfg)kmalloc(sizeof(tPacketFilterCfg), GFP_KERNEL);
 
     if(pRequest == NULL) {
-        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Out of memory - cant alloc %lu bytes",
+        hddLog(VOS_TRACE_LEVEL_FATAL, "%s: Out of memory - cant alloc %zd bytes",
                 __FUNCTION__,sizeof(tpPacketFilterCfg));
         return -ENOMEM;
     }
