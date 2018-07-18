@@ -12756,8 +12756,10 @@ end:
 //Begin Mot IKHSS7-28961 : Incorrect emtpty scan results because of againg out
 void hdd_prevent_suspend_after_scan(long hz)
 {
-//Todo:Just for wlan open MS0,need use Qcom define instead
-  __pm_wakeup_event(&wlan_wake_lock_scan, hz);
+  //__pm_wakeup_event(&wlan_wake_lock_scan, hz);
+
+    v_U32_t timeout = jiffies_to_msecs(hz) ;
+    hdd_prevent_suspend_timeout(timeout, WIFI_POWER_EVENT_WAKELOCK_SCAN);
 }
 //END IKHSS7-28961
 
