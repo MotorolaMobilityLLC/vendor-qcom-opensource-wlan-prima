@@ -3953,7 +3953,6 @@ int __iw_softap_get_channel_list(struct net_device *dev,
     tpChannelListInfo channel_list = (tpChannelListInfo) extra;
     eCsrBand curBand = eCSR_BAND_ALL;
     hdd_context_t *pHddCtx;
-    tpAniSirGlobal pMac; //IKSWO-79967
     int ret = 0;
 
     ENTER();
@@ -3983,7 +3982,6 @@ int __iw_softap_get_channel_list(struct net_device *dev,
         hddLog(LOGE,FL("not able get the current frequency band"));
         return -EIO;
     }
-    pMac = PMAC_STRUCT( hHal ); //IKSWO-79967
     wrqu->data.length = sizeof(tChannelListInfo);
     ENTER();
 
@@ -4020,10 +4018,7 @@ int __iw_softap_get_channel_list(struct net_device *dev,
         hddLog(LOGE,FL("Failed to get Domain ID, %d"),domainIdCurrentSoftap);
         return -EIO;
     }
-    //BEGIN IKSWO-79967, check if current country need disable MHS 5G Band1
-    if( (VOS_TRUE == vos_IsDisableMhsBand1CountryCode(pMac->scan.countryCodeCurrent) ||
-             REGDOMAIN_FCC == domainIdCurrentSoftap) &&
-    //END IKSWO-79967
+    if(REGDOMAIN_FCC == domainIdCurrentSoftap &&
              pHddCtx->cfg_ini->gEnableStrictRegulatoryForFCC )
     {
         for(i = 0; i < temp_num_channels; i++)
