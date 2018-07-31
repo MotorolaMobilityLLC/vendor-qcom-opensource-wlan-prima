@@ -6841,6 +6841,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
     int currentBand = 0;
     struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1];
     uint8_t hw_mode;
+    tpAniSirGlobal pMac = PMAC_STRUCT( hHal ); //IKSWP-4221
     int i;
 
     if (NULL == wdev) {
@@ -6907,6 +6908,13 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
             currentBand = 0;
         }
     }
+
+    //BEGIN IKSWP-4221
+    if(VOS_TRUE == vos_IsDisableMhsBand1CountryCode(pMac->scan.countryCodeCurrent)) {
+        if(currentBand == 1)
+            currentBand = 0;
+    }
+    //END IKSWP-4221
 
     hddLog(VOS_TRACE_LEVEL_INFO,
             "ACS Config for wlan0: HW_MODE: %d NUM CHANNELS: %d START_CH: %d"
