@@ -20951,8 +20951,6 @@ void WDA_ReceiveFilterClearFilterRespCallback(
                         void * pUserData)
 {
    tWDA_ReqParams *pWdaParams = (tWDA_ReqParams *)pUserData;
-   tSirRcvFltPktClearParam *pktClearParam;
-
    VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
                                           "<------ %s " ,__func__);
 /*   WDA_VOS_ASSERT(NULL != pWdaParams); */
@@ -20962,14 +20960,6 @@ void WDA_ReceiveFilterClearFilterRespCallback(
                  "%s: pWdaParams received NULL", __func__);
       VOS_ASSERT(0) ;
       return ;
-   }
-
-   pktClearParam = (tSirRcvFltPktClearParam *)pWdaParams->wdaMsgParam;
-   if(pktClearParam->pktFilterCallback)
-   {
-       pktClearParam->pktFilterCallback(
-            pktClearParam->cbCtx,
-            CONVERT_WDI2SIR_STATUS(pwdiRcvFltPktClearRspParamsType->wdiStatus));
    }
 
    vos_mem_free(pWdaParams->wdaWdiApiMsgParam);
@@ -20988,7 +20978,6 @@ void WDA_ReceiveFilterClearFilterRespCallback(
 void WDA_ReceiveFilterClearFilterReqCallback(WDI_Status wdiStatus, void* pUserData)
 {
    tWDA_ReqParams *pWdaParams = (tWDA_ReqParams *)pUserData;
-   tSirRcvFltPktClearParam *pktClearParam;
 
    VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_INFO,
               "<------ %s, wdiStatus: %d", __func__, wdiStatus);
@@ -21003,13 +20992,6 @@ void WDA_ReceiveFilterClearFilterReqCallback(WDI_Status wdiStatus, void* pUserDa
 
    if(IS_WDI_STATUS_FAILURE(wdiStatus))
    {
-      pktClearParam = (tSirRcvFltPktClearParam *)pWdaParams->wdaMsgParam;
-      if(pktClearParam->pktFilterCallback)
-      {
-          pktClearParam->pktFilterCallback(
-              pktClearParam->cbCtx,
-              CONVERT_WDI2SIR_STATUS(wdiStatus));
-      }
       vos_mem_free(pWdaParams->wdaWdiApiMsgParam);
       vos_mem_free(pWdaParams->wdaMsgParam);
       vos_mem_free(pWdaParams);
@@ -21067,12 +21049,6 @@ VOS_STATUS WDA_ProcessReceiveFilterClearFilterReq (tWDA_CbContext *pWDA,
    {
       VOS_TRACE( VOS_MODULE_ID_WDA, VOS_TRACE_LEVEL_ERROR,
               "Failure in WDA_ProcessReceiveFilterClearFilterReq(), free all the memory " );
-      if(pRcvFltPktClearParam->pktFilterCallback)
-      {
-          pRcvFltPktClearParam->pktFilterCallback(
-                pRcvFltPktClearParam->cbCtx,
-                CONVERT_WDI2SIR_STATUS(status));
-      }
       vos_mem_free(pWdaParams->wdaWdiApiMsgParam) ;
       vos_mem_free(pWdaParams->wdaMsgParam);
       vos_mem_free(pWdaParams);
