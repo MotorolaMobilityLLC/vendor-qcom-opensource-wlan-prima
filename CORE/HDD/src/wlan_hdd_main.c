@@ -155,6 +155,18 @@ static char *country_code;
 static int   enable_11d = -1;
 static int   enable_dfs_chan_scan = -1;
 
+#define BUF_LEN_SAR 10
+static char  sar_sta_buffer[BUF_LEN_SAR];
+static struct kparam_string sar_sta = {
+   .string = sar_sta_buffer,
+   .maxlen = BUF_LEN_SAR,
+};
+static char  sar_mhs_buffer[BUF_LEN_SAR];
+static struct kparam_string sar_mhs = {
+   .string = sar_mhs_buffer,
+   .maxlen = BUF_LEN_SAR,
+};
+
 #ifndef MODULE
 static int wlan_hdd_inited;
 #endif
@@ -18517,6 +18529,12 @@ bool hdd_is_cli_iface_up(hdd_context_t *hdd_ctx)
 	return false;
 }
 
+static int sar_changed_handler(const char *kmessage,
+                                  const struct kernel_param *kp)
+{
+   return param_set_copystring(kmessage, kp);
+}
+
 //Register the module init/exit functions
 module_init(hdd_module_init);
 module_exit(hdd_module_exit);
@@ -18532,6 +18550,11 @@ static const struct kernel_param_ops con_mode_ops = {
 
 static const struct kernel_param_ops fwpath_ops = {
 	.set = fwpath_changed_handler,
+	.get = param_get_string,
+};
+
+static const struct kernel_param_ops sar_ops = {
+	.set = sar_changed_handler,
 	.get = param_get_string,
 };
 
@@ -18553,3 +18576,10 @@ module_param(enable_11d, int,
 
 module_param(country_code, charp,
              S_IRUSR | S_IRGRP | S_IROTH);
+
+module_param_cb(sar_sta, &sar_ops, &sar_sta,
+                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+module_param_cb(sar_mhs, &sar_ops, &sar_mhs,
+                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
