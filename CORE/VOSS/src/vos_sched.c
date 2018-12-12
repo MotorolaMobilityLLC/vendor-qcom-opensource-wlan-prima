@@ -353,6 +353,7 @@ VosMCThread
   v_BOOL_t shutdown              = VOS_FALSE;
   hdd_context_t *pHddCtx         = NULL;
   v_CONTEXT_t pVosContext        = NULL;
+  unsigned long int stack_protect_base;
 
   if (Arg == NULL)
   {
@@ -361,6 +362,12 @@ VosMCThread
      return 0;
   }
   set_user_nice(current, -2);
+
+  //BEGIN IKSWP-34109, MMI_STOPSHIP <WiFi>: debug patch for corrupted stack
+  /*Mark top page of stack after task struct and thread info as RO, to catch stack overflow*/
+  stack_protect_base = ((unsigned long int)(task_thread_info(current)) + /*Align to next page*/0x1000)&((unsigned long int)~0xFFF);
+  set_memory_ro(stack_protect_base, /*Only one page*/1);
+  //END IKSWP-34109
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
   daemonize("MC_Thread");
