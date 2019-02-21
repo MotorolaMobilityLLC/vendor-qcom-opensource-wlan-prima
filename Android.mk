@@ -150,6 +150,19 @@ ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED), true)
 else
     LOCAL_MODULE_PATH         := $(TARGET_OUT)/lib/modules/$(WLAN_CHIPSET)
 endif # PRODUCT_VENDOR_MOVE_ENABLED
+
+# Copy the unstrip file and all elf files to out symbols folders
+###########################################################
+WLAN_SYMBOLS_OUT        := $(TARGET_OUT_UNSTRIPPED)/$(LOCAL_PATH)
+UNSTRIPPED_MODULE       := $(WLAN_CHIPSET)_wlan.ko.unstripped
+UNSTRIPPED_FILE_PATH    := $(TARGET_OUT_INTERMEDIATES)/$(LOCAL_PATH)/$(UNSTRIPPED_MODULE)
+
+INSTALL_WLAN_UNSTRIPPED_MODULE := mkdir -p $(WLAN_SYMBOLS_OUT); \
+   cp -rf $(UNSTRIPPED_FILE_PATH) $(WLAN_SYMBOLS_OUT);
+
+LOCAL_POST_INSTALL_CMD := $(INSTALL_WLAN_UNSTRIPPED_MODULE)
+###########################################################
+
 include $(DLKM_DIR)/AndroidKernelModule.mk
 ###########################################################
 
