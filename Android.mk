@@ -157,7 +157,11 @@ WLAN_SYMBOLS_OUT        := $(TARGET_OUT_UNSTRIPPED)/$(LOCAL_PATH)
 UNSTRIPPED_MODULE       := $(WLAN_CHIPSET)_wlan.ko.unstripped
 UNSTRIPPED_FILE_PATH    := $(TARGET_OUT_INTERMEDIATES)/$(LOCAL_PATH)/$(UNSTRIPPED_MODULE)
 
+ifneq (,$(filter deen%,$(TARGET_PRODUCT)))
+WLAN_ELF_FILE_PATH      := vendor/qcom/nonhlos/wcnss_proc-403/build/ms
+else
 WLAN_ELF_FILE_PATH      := vendor/qcom/nonhlos/CNSS.PR.4.0.3/wcnss_proc/build/ms
+endif
 
 INSTALL_WLAN_UNSTRIPPED_MODULE := mkdir -p $(WLAN_SYMBOLS_OUT); \
    cp -rf $(UNSTRIPPED_FILE_PATH) $(WLAN_SYMBOLS_OUT); \
